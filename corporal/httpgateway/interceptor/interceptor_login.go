@@ -130,18 +130,15 @@ func (me *LoginInterceptor) Intercept(r *http.Request) InterceptorResponse {
 		// Old deprecated field
 		userId = payload.User
 	}
-	// Encrypted login requests are marked with a '*' at the beginning of the userId.
-	if strings.HasPrefix(userId, "*") {
+	// If it's an encrypted login request, we need to decrypt the credentials.
+	if strings.Contains(r.URL.Path, "/encryptedLogin") {
 
 		// We get key and iv from the config, so we can decrypt the credentials
 		key := me.config.DecryptKey
 		iv := me.config.DecryptIv
 
-		// The last part of userId is the PIN number that we will add to the password later.
-		passwordLastPart := strings.TrimPrefix(userId, "*")
-		if passwordLastPart == "" {
-			return createInterceptorErrorResponse(loggingContextFields, matrix.ErrorBadJson, "Invalid encrypted user field")
-		}
+		// The userId is the PIN number that we will add to the password later.
+
 		// We decrypt the password field, which contains the encrypted credentials.
 		decryptedUsername, decryptedPassword, err := util.ProcessEncryptedUserAuth(payload.Password, key, iv)
 		if err != nil {
@@ -149,8 +146,8 @@ func (me *LoginInterceptor) Intercept(r *http.Request) InterceptorResponse {
 			return createInterceptorErrorResponse(loggingContextFields, matrix.ErrorBadJson, "Failed to process authentication")
 		}
 
-		// We append the passwordLastPart to the decryptedPassword
-		decryptedPassword = fmt.Sprintf("%s%s", decryptedPassword, passwordLastPart)
+		// We append the userId - which is in fact a PIN number that has to be appended to the decryptedPassword
+		decryptedPassword = fmt.Sprintf("%s%s", decryptedPassword, userId)
 		userId = decryptedUsername
 		// Update the payload with the decrypted values
 		payload.User = decryptedUsername
@@ -203,6 +200,13 @@ func (me *LoginInterceptor) Intercept(r *http.Request) InterceptorResponse {
 		r.Body = io.NopCloser(bytes.NewReader(newBodyBytes))
 		r.ContentLength = int64(len(newBodyBytes))
 
+		// If encrypted request, we will also have to redirect the request to the Matrix server's /login API.
+		if strings.Contains(r.URL.Path, "/encryptedLogin") {
+
+			r.URL.Path = strings.Replace(r.URL.Path, "/encryptedLogin", "/login", 1)
+			r.RequestURI = strings.Replace(r.RequestURI, "/encryptedLogin", "/login", 1)
+
+		}
 		return InterceptorResponse{
 			Result:               InterceptorResultProxy,
 			LoggingContextFields: loggingContextFields,

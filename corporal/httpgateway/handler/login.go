@@ -46,6 +46,10 @@ func (me *loginHandler) RegisterRoutesWithRouter(router *mux.Router) {
 		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/login{optionalTrailingSlash:[/]?}`,
 		me.createInterceptorHandler("login", me.loginInterceptor),
 	).Methods("POST")
+	router.Handle(
+		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/encryptedLogin{optionalTrailingSlash:[/]?}`,
+		me.createInterceptorHandler("encryptedLogin", me.loginInterceptor),
+	).Methods("POST")
 }
 
 func (me *loginHandler) createInterceptorHandler(name string, interceptorObj interceptor.Interceptor) http.HandlerFunc {
