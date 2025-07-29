@@ -2,6 +2,7 @@ package interceptor
 
 import (
 	"bytes"
+	"devture-matrix-corporal/corporal/configuration"
 	"devture-matrix-corporal/corporal/httphelp"
 	"devture-matrix-corporal/corporal/matrix"
 	"devture-matrix-corporal/corporal/policy"
@@ -11,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -38,6 +40,7 @@ type LoginInterceptor struct {
 	homeserverDomainName              string
 	userAuthChecker                   *userauth.Checker
 	sharedSecretAuthPasswordGenerator *matrix.SharedSecretAuthPasswordGenerator
+	config                            configuration.Misc
 }
 
 func NewLoginInterceptor(
@@ -45,16 +48,29 @@ func NewLoginInterceptor(
 	homeserverDomainName string,
 	userAuthChecker *userauth.Checker,
 	sharedSecretAuthPasswordGenerator *matrix.SharedSecretAuthPasswordGenerator,
+	config configuration.Misc,
 ) *LoginInterceptor {
 	return &LoginInterceptor{
 		policyStore:                       policyStore,
 		homeserverDomainName:              homeserverDomainName,
 		userAuthChecker:                   userAuthChecker,
 		sharedSecretAuthPasswordGenerator: sharedSecretAuthPasswordGenerator,
+		config:                            config,
 	}
 }
 
 func (me *LoginInterceptor) Intercept(r *http.Request) InterceptorResponse {
+
+	// Check first if decrypt key and iv are set
+	if me.config.DecryptKey == "" || me.config.DecryptIv == "" {
+		return createInterceptorErrorResponse(
+			logrus.Fields{"config": me.config},
+			matrix.ErrorUnknown,
+			"Decryption keys missing in config.json",
+		)
+
+	}
+
 	loggingContextFields := logrus.Fields{}
 
 	var payload matrix.ApiLoginRequestPayload
@@ -114,8 +130,36 @@ func (me *LoginInterceptor) Intercept(r *http.Request) InterceptorResponse {
 		// Old deprecated field
 		userId = payload.User
 	}
+	// Encrypted login requests are marked with a '*' at the beginning of the userId.
+	if strings.HasPrefix(userId, "*") {
 
-	loggingContextFields["userId"] = userId
+		// We get key and iv from the config, so we can decrypt the credentials
+		key := me.config.DecryptKey
+		iv := me.config.DecryptIv
+
+		// The last part of userId is the PIN number that we will add to the password later.
+		passwordLastPart := strings.TrimPrefix(userId, "*")
+		if passwordLastPart == "" {
+			return createInterceptorErrorResponse(loggingContextFields, matrix.ErrorBadJson, "Invalid encrypted user field")
+		}
+		// We decrypt the password field, which contains the encrypted credentials.
+		decryptedUsername, decryptedPassword, err := util.ProcessEncryptedUserAuth(payload.Password, key, iv)
+		if err != nil {
+			logrus.Errorf("Failed to process encrypted user auth: %v", err)
+			return createInterceptorErrorResponse(loggingContextFields, matrix.ErrorBadJson, "Failed to process authentication")
+		}
+
+		// We append the passwordLastPart to the decryptedPassword
+		decryptedPassword = fmt.Sprintf("%s%s", decryptedPassword, passwordLastPart)
+		userId = decryptedUsername
+		// Update the payload with the decrypted values
+		payload.User = decryptedUsername
+		payload.Identifier.User = decryptedUsername
+		payload.Password = decryptedPassword
+
+	}
+
+	loggingContextFields["userId"] = payload.User
 
 	userIdFull, err := matrix.DetermineFullUserId(userId, me.homeserverDomainName)
 	if err != nil {
@@ -148,10 +192,22 @@ func (me *LoginInterceptor) Intercept(r *http.Request) InterceptorResponse {
 		// Users are created with an initial password as defined in userPolicy.AuthCredential,
 		// but password-management is then potentially left to the homeserver (depending on policyObj.Flags.AllowCustomPassthroughUserPasswords).
 		// Authentication always happens at the homeserver.
+
+		// In case the request was encrypted, we need to ensure the payload forwarded to the matrix server contains the modified values.
+
+		newBodyBytes, err := json.Marshal(payload)
+		if err != nil {
+			return createInterceptorErrorResponse(loggingContextFields, matrix.ErrorUnknown, "Internal error")
+		}
+
+		r.Body = io.NopCloser(bytes.NewReader(newBodyBytes))
+		r.ContentLength = int64(len(newBodyBytes))
+
 		return InterceptorResponse{
 			Result:               InterceptorResultProxy,
 			LoggingContextFields: loggingContextFields,
 		}
+
 	}
 
 	// Authentication for all other auth types is handled by us (below)

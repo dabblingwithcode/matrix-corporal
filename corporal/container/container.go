@@ -106,6 +106,7 @@ func BuildContainer(
 			configuration.Matrix.HomeserverDomainName,
 			container.Get("policy.userauth.checker").(*userauth.Checker),
 			container.Get("matrix.shared_secret_auth.password_generator").(*matrix.SharedSecretAuthPasswordGenerator),
+			configuration.Misc,
 		)
 	})
 
