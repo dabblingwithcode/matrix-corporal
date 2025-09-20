@@ -14,7 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type httpRequestFactory func() (*http.Request, error)
+type httpRequestFactory func() (*http.Request, *context.CancelFunc, error)
 
 // restServiceConsultingRequest reprents as request payload to be sent to a REST service.
 //
@@ -149,11 +149,12 @@ func (me *RESTServiceConsultor) callRestServiceWithRetries(
 	var restError error
 
 	for attemptNumber := uint(1); attemptNumber <= attemptsCount; attemptNumber++ {
-		requestToSend, err := requestFactory()
+		requestToSend, cancel, err := requestFactory()
 		if err != nil {
 			logger.Errorf("RESTServiceConsultor: failed preparing HTTP Request: %s", err)
 			return nil, err
 		}
+		defer (*cancel)()
 
 		logger = logger.WithFields(logrus.Fields{
 			"RESTRrequestMethod": requestToSend.Method,
@@ -256,10 +257,9 @@ func prepareConsultingHTTPRequestFactory(
 		timeoutDuration = time.Duration(*hook.RESTServiceRequestTimeoutMilliseconds) * time.Millisecond
 	}
 
-	return func() (*http.Request, error) {
+	return func() (*http.Request, *context.CancelFunc, error) {
 		// This needs to be done each time, because it uses absolute time inside.
 		ctx, cancel := context.WithTimeout(context.Background(), timeoutDuration)
-		defer cancel()
 
 		consultingHTTPRequest, err := http.NewRequestWithContext(
 			ctx,
@@ -268,7 +268,8 @@ func prepareConsultingHTTPRequestFactory(
 			bytes.NewReader(consultingRequestPayloadBytes),
 		)
 		if err != nil {
-			return nil, err
+			cancel()
+			return nil, nil, err
 		}
 
 		consultingHTTPRequest.Header.Set("Content-Type", "application/json")
@@ -278,7 +279,7 @@ func prepareConsultingHTTPRequestFactory(
 			}
 		}
 
-		return consultingHTTPRequest, nil
+		return consultingHTTPRequest, &cancel, nil
 	}, nil
 }
 
