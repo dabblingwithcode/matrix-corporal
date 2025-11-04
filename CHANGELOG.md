@@ -1,3 +1,14 @@
+# Version 3.1.7 (2025-09-20)
+
+- Internal compiler and dependency upgrades.
+- Bugfixes
+
+
+# Version 3.1.6 (2025-08-29)
+
+Dependency upgrades.
+
+
 # Version 3.1.5 (2025-08-15)
 
 Internal compiler and dependency upgrades.
