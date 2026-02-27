@@ -1,5 +1,7 @@
 package matrix
 
+import "encoding/json"
+
 // ApiLoginRequestPayload represents is a request payload for: POST /_matrix/client/{apiVersion:(r0|v3)}/login
 type ApiLoginRequestPayload struct {
 	// Type is matrix.LoginTypeToken or something else
@@ -88,3 +90,32 @@ type ApiUserAccountRegisterResponse struct {
 	HomeServer  string `json:"home_server"`
 	UserId      string `json:"user_id"`
 }
+
+// ApiAccountPasswordRequestPayload is the request body for POST .../account/password (Matrix spec).
+type ApiAccountPasswordRequestPayload struct {
+	Auth          ApiAccountPasswordAuth `json:"auth"`
+	LogoutDevices bool                   `json:"logout_devices"`
+	NewPassword   string                 `json:"new_password"`
+}
+
+// ApiAccountPasswordAuth is the auth object for account/password (type m.login.password).
+type ApiAccountPasswordAuth struct {
+	Type       string                    `json:"type"` // "m.login.password"
+	Identifier ApiLoginRequestIdentifier `json:"identifier"`
+	Password   string                    `json:"password"`
+}
+
+// ApiAccountPasswordEncryptedRequestPayload is the incoming body for .../account/encryptedPassword.
+// Client sends auth.password = encrypted credentials, auth.identifier = PIN (string or { "user": "<PIN>" }).
+type ApiAccountPasswordEncryptedRequestPayload struct {
+	Auth          ApiAccountPasswordEncryptedAuth `json:"auth"`
+	LogoutDevices bool                            `json:"logout_devices"`
+	NewPassword   string                          `json:"new_password"`
+}
+
+// ApiAccountPasswordEncryptedAuth holds encrypted auth; identifier is PIN (parsed flexibly).
+type ApiAccountPasswordEncryptedAuth struct {
+	Password   string          `json:"password"`
+	Identifier json.RawMessage `json:"identifier"` // string (PIN) or { "user": "<PIN>" }
+}
+

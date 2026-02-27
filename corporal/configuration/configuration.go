@@ -24,6 +24,7 @@ type HttpApi struct {
 	ListenAddress            string
 	AuthorizationBearerToken string
 	TimeoutMilliseconds      int
+	LogBufferSize            int
 }
 
 type HttpGateway struct {
@@ -96,6 +97,9 @@ func LoadConfiguration(filePath string, logger *logrus.Logger) (*Configuration, 
 }
 
 func setConfigurationDefaults(configuration *Configuration) {
+	if configuration.HttpApi.LogBufferSize == 0 {
+		configuration.HttpApi.LogBufferSize = 500
+	}
 	if configuration.HttpGateway.UserMappingResolver.CacheSize == 0 {
 		configuration.HttpGateway.UserMappingResolver.CacheSize = 10000
 	}

@@ -30,6 +30,11 @@ func DecryptAESCBC(encryptedData, key, iv string) (string, error) {
 		return "", fmt.Errorf("invalid IV length: expected 16 bytes, got %d", len(ivBytes))
 	}
 
+	// CBC requires ciphertext length to be a multiple of block size; otherwise CryptBlocks panics
+	if len(ciphertext)%aes.BlockSize != 0 {
+		return "", fmt.Errorf("ciphertext length %d is not a multiple of block size (%d)", len(ciphertext), aes.BlockSize)
+	}
+
 	// Create cipher block
 	block, err := aes.NewCipher(keyBytes)
 	if err != nil {

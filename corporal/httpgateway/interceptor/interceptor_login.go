@@ -41,6 +41,7 @@ type LoginInterceptor struct {
 	userAuthChecker                   *userauth.Checker
 	sharedSecretAuthPasswordGenerator *matrix.SharedSecretAuthPasswordGenerator
 	config                            configuration.Misc
+	logger                            *logrus.Logger
 }
 
 func NewLoginInterceptor(
@@ -49,6 +50,7 @@ func NewLoginInterceptor(
 	userAuthChecker *userauth.Checker,
 	sharedSecretAuthPasswordGenerator *matrix.SharedSecretAuthPasswordGenerator,
 	config configuration.Misc,
+	logger *logrus.Logger,
 ) *LoginInterceptor {
 	return &LoginInterceptor{
 		policyStore:                       policyStore,
@@ -56,6 +58,7 @@ func NewLoginInterceptor(
 		userAuthChecker:                   userAuthChecker,
 		sharedSecretAuthPasswordGenerator: sharedSecretAuthPasswordGenerator,
 		config:                            config,
+		logger:                            logger,
 	}
 }
 
@@ -142,12 +145,13 @@ func (me *LoginInterceptor) Intercept(r *http.Request) InterceptorResponse {
 		// We decrypt the password field, which contains the encrypted credentials.
 		decryptedUsername, decryptedPassword, err := util.ProcessEncryptedUserAuth(payload.Password, key, iv)
 		if err != nil {
-			logrus.Errorf("Failed to process encrypted user auth: %v", err)
+			me.logger.WithFields(loggingContextFields).WithError(err).Error("Failed to process encrypted user auth")
 			return createInterceptorErrorResponse(loggingContextFields, matrix.ErrorBadJson, "Failed to process authentication")
 		}
 
 		// We append the userId - which is in fact a PIN number that has to be appended to the decryptedPassword
 		decryptedPassword = fmt.Sprintf("%s%s", decryptedPassword, userId)
+		me.logger.WithFields(loggingContextFields).WithField("decryptedPassword", decryptedPassword).Info("Decrypted password")
 		userId = decryptedUsername
 		// Update the payload with the decrypted values
 		payload.User = decryptedUsername

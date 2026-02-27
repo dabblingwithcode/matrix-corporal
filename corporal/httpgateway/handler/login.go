@@ -13,23 +13,26 @@ import (
 )
 
 type loginHandler struct {
-	reverseProxy     *httputil.ReverseProxy
-	hookRunner       *hookrunner.HookRunner
-	loginInterceptor interceptor.Interceptor
-	logger           *logrus.Logger
+	reverseProxy              *httputil.ReverseProxy
+	hookRunner                *hookrunner.HookRunner
+	loginInterceptor          interceptor.Interceptor
+	passwordChangeInterceptor interceptor.Interceptor
+	logger                    *logrus.Logger
 }
 
 func NewLoginHandler(
 	reverseProxy *httputil.ReverseProxy,
 	hookRunner *hookrunner.HookRunner,
 	loginInterceptor interceptor.Interceptor,
+	passwordChangeInterceptor interceptor.Interceptor,
 	logger *logrus.Logger,
 ) *loginHandler {
 	return &loginHandler{
-		reverseProxy:     reverseProxy,
-		hookRunner:       hookRunner,
-		loginInterceptor: loginInterceptor,
-		logger:           logger,
+		reverseProxy:              reverseProxy,
+		hookRunner:                hookRunner,
+		loginInterceptor:          loginInterceptor,
+		passwordChangeInterceptor: passwordChangeInterceptor,
+		logger:                    logger,
 	}
 }
 
@@ -49,6 +52,10 @@ func (me *loginHandler) RegisterRoutesWithRouter(router *mux.Router) {
 	router.Handle(
 		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/encryptedLogin{optionalTrailingSlash:[/]?}`,
 		me.createInterceptorHandler("encryptedLogin", me.loginInterceptor),
+	).Methods("POST")
+	router.Handle(
+		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/account/encryptedPassword{optionalTrailingSlash:[/]?}`,
+		me.createInterceptorHandler("account.encryptedPassword", me.passwordChangeInterceptor),
 	).Methods("POST")
 }
 

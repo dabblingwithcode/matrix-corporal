@@ -12,6 +12,7 @@ import (
 	"devture-matrix-corporal/corporal/httpgateway/hookrunner"
 	"devture-matrix-corporal/corporal/httpgateway/interceptor"
 	"devture-matrix-corporal/corporal/httphelp"
+	"devture-matrix-corporal/corporal/logstore"
 	"devture-matrix-corporal/corporal/matrix"
 	"devture-matrix-corporal/corporal/policy"
 	"devture-matrix-corporal/corporal/policy/provider"
@@ -50,8 +51,15 @@ func BuildContainer(
 	container := service.New()
 	shutdownHandler := &ContainerShutdownHandler{}
 
+	logStore := logstore.NewStore(configuration.HttpApi.LogBufferSize)
+	logger.AddHook(logstore.NewHook(logStore))
+
 	container.Set("logger", func(c service.Container) interface{} {
 		return logger
+	})
+
+	container.Set("logstore", func(c service.Container) interface{} {
+		return logStore
 	})
 
 	container.Set("matrix.user_mapping_resolver.cache", func(c service.Container) interface{} {
@@ -107,7 +115,12 @@ func BuildContainer(
 			container.Get("policy.userauth.checker").(*userauth.Checker),
 			container.Get("matrix.shared_secret_auth.password_generator").(*matrix.SharedSecretAuthPasswordGenerator),
 			configuration.Misc,
+			logger,
 		)
+	})
+
+	container.Set("httpgateway.interceptor.password_change", func(c service.Container) interface{} {
+		return interceptor.NewPasswordChangeInterceptor(configuration.Misc)
 	})
 
 	container.Set("httpgateway.hook_runner", func(c service.Container) interface{} {
@@ -171,6 +184,7 @@ func BuildContainer(
 			container.Get("matrix.http_reverse_proxy").(*httputil.ReverseProxy),
 			container.Get("httpgateway.hook_runner").(*hookrunner.HookRunner),
 			container.Get("httpgateway.interceptor.login").(interceptor.Interceptor),
+			container.Get("httpgateway.interceptor.password_change").(interceptor.Interceptor),
 			logger,
 		)
 	})
@@ -212,6 +226,7 @@ func BuildContainer(
 		return []httphelp.HandlerRegistrator{
 			container.Get("httpapi.server.handler_registrator.policy").(httphelp.HandlerRegistrator),
 			container.Get("httpapi.server.handler_registrator.user").(httphelp.HandlerRegistrator),
+			container.Get("httpapi.server.handler_registrator.logs").(httphelp.HandlerRegistrator),
 		}
 	})
 
@@ -226,6 +241,12 @@ func BuildContainer(
 		return httpApiHandler.NewUserApiHandlerRegistrator(
 			configuration.Matrix.HomeserverDomainName,
 			container.Get("connector.synapse").(*connector.SynapseConnector),
+		)
+	})
+
+	container.Set("httpapi.server.handler_registrator.logs", func(c service.Container) interface{} {
+		return httpApiHandler.NewLogsApiHandlerRegistrator(
+			container.Get("logstore").(*logstore.Store),
 		)
 	})
 
