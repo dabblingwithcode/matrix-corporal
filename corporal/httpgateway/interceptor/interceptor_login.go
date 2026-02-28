@@ -65,7 +65,7 @@ func NewLoginInterceptor(
 func (me *LoginInterceptor) Intercept(r *http.Request) InterceptorResponse {
 
 	// Check first if decrypt key and iv are set
-	if me.config.DecryptKey == "" || me.config.DecryptIv == "" {
+	if me.config.DecryptKey == "" {
 		return createInterceptorErrorResponse(
 			logrus.Fields{"config": me.config},
 			matrix.ErrorUnknown,

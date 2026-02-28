@@ -28,7 +28,7 @@ func NewPasswordChangeInterceptor(config configuration.Misc) *PasswordChangeInte
 
 // Intercept implements interceptor.Interceptor.
 func (me *PasswordChangeInterceptor) Intercept(r *http.Request) InterceptorResponse {
-	if me.config.DecryptKey == "" || me.config.DecryptIv == "" {
+	if me.config.DecryptKey == "" {
 		return createInterceptorErrorResponse(
 			logrus.Fields{"config": me.config},
 			matrix.ErrorUnknown,

@@ -67,7 +67,6 @@ type Reconciliation struct {
 type Misc struct {
 	Debug      bool
 	DecryptKey string
-	DecryptIv  string
 }
 
 type PolicyProvider map[string]interface{}

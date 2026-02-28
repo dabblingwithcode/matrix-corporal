@@ -196,7 +196,7 @@ curl -s -X PUT \
 
 ## Gateway: encrypted auth (client-facing)
 
-These endpoints are on the **HTTP Gateway** (e.g. `http://localhost:41080`), not the management API. They do **not** use Bearer token; the client sends encrypted credentials. Corporal decrypts with `Misc.DecryptKey` and `Misc.DecryptIv` from config, then proxies to Synapse’s normal `/login` and `/account/password`. Ensure `DecryptKey` and `DecryptIv` are set in config or the gateway returns an error.
+These endpoints are on the **HTTP Gateway** (e.g. `http://localhost:41080`), not the management API. They do **not** use Bearer token; the client sends encrypted credentials. Corporal decrypts with `Misc.DecryptKey` from config, then proxies to Synapse’s normal `/login` and `/account/password`. Ensure `DecryptKey` is set in config or the gateway returns an error.
 
 ---
 

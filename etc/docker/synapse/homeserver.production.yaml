@@ -46,6 +46,12 @@ log_config: "/data/log.config"
 media_store_path: "/media_store"
 uploads_path: "/tmp"
 
+room_list_publication_rules:
+  - user_id: "@${MATRIX_ADMIN_ID}:${MATRIX_SERVER_NAME}"
+    action: deny
+
+  - action: allow
+
 rc_message:
   per_second: 0.2
   burst_count: 10

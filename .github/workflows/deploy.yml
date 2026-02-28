@@ -99,7 +99,6 @@ jobs:
           export MATRIX_REGISTRATION_SHARED_SECRET="${{ secrets.MATRIX_REGISTRATION_SHARED_SECRET }}"
           export CORPORAL_API_TOKEN="${{ secrets.CORPORAL_API_TOKEN }}"
           export CORPORAL_DECRYPT_KEY="${{ secrets.CORPORAL_DECRYPT_KEY }}"
-          export CORPORAL_DECRYPT_IV="${{ secrets.CORPORAL_DECRYPT_IV }}"
           envsubst < etc/docker/corporal/config.production.json > etc/docker/corporal/config.production.json.out
           mv etc/docker/corporal/config.production.json.out etc/docker/corporal/config.production.json
 
