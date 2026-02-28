@@ -36,6 +36,8 @@
 	},
 
 	"Misc": {
-		"Debug": false
+		"Debug": false,
+		"DecryptKey": "${CORPORAL_DECRYPT_KEY}",
+		"DecryptIv": "${CORPORAL_DECRYPT_IV}"
 	}
 }
