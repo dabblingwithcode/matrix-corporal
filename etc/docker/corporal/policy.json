@@ -1,0 +1,20 @@
+{
+	"schemaVersion": 2,
+	"flags": {
+		"allowCustomUserDisplayNames": false,
+		"allowCustomUserAvatars": false,
+		"allowCustomPassthroughUserPasswords": false,
+		"allowUnauthenticatedPasswordResets": false,
+		"forbidRoomCreation": false,
+		"forbidEncryptedRoomCreation": false,
+		"forbidUnencryptedRoomCreation": false
+	},
+
+	"managedRoomIds": [],
+
+	"hooks": [],
+
+	"users": [
+
+	]
+}

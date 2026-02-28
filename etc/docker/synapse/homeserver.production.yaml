@@ -1,0 +1,82 @@
+modules:
+  - module: "shared_secret_authenticator.SharedSecretAuthProvider"
+    config:
+      com_devture_shared_secret_auth_support_enabled: true
+      m_login_password_support_enabled: true
+      shared_secret: "${MATRIX_AUTH_SHARED_SECRET}"
+
+server_name: "${MATRIX_SERVER_NAME}"
+
+pid_file: /homeserver.pid
+
+default_room_version: "12"
+
+federation_ip_range_blacklist:
+  - '127.0.0.0/8'
+  - '10.0.0.0/8'
+  - '172.16.0.0/12'
+  - '192.168.0.0/16'
+  - '100.64.0.0/10'
+  - '169.254.0.0/16'
+  - '::1/128'
+  - 'fe80::/64'
+  - 'fc00::/7'
+
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    resources:
+      - names: [client, federation]
+        compress: false
+
+database:
+  name: "psycopg2"
+  args:
+    user: "${POSTGRES_USER}"
+    password: "${POSTGRES_PASSWORD}"
+    database: "${POSTGRES_DB}"
+    host: "postgres"
+    cp_min: 5
+    cp_max: 10
+
+log_config: "/data/log.config"
+
+media_store_path: "/media_store"
+uploads_path: "/tmp"
+
+rc_message:
+  per_second: 0.2
+  burst_count: 10
+
+rc_registration:
+  per_second: 0.17
+  burst_count: 3
+
+rc_login:
+  address:
+    per_second: 0.17
+    burst_count: 3
+  account:
+    per_second: 0.17
+    burst_count: 3
+  failed_attempts:
+    per_second: 0.17
+    burst_count: 3
+
+enable_registration: false
+registration_requires_token: true
+registration_shared_secret: "${MATRIX_REGISTRATION_SHARED_SECRET}"
+
+macaroon_secret_key: "${MATRIX_MACAROON_SECRET_KEY}"
+form_secret: "${MATRIX_FORM_SECRET}"
+
+signing_key_path: "/data/signing.key"
+
+report_stats: false
+
+password_providers:
+  - module: "rest_auth_provider.RestAuthProvider"
+    config:
+      endpoint: "http://matrix-corporal:41080/_matrix/corporal"

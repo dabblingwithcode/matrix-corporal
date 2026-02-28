@@ -1,0 +1,41 @@
+{
+	"Matrix": {
+		"HomeserverDomainName": "${MATRIX_SERVER_NAME}",
+		"HomeserverApiEndpoint": "http://synapse:8008",
+		"AuthSharedSecret": "${MATRIX_AUTH_SHARED_SECRET}",
+		"RegistrationSharedSecret": "${MATRIX_REGISTRATION_SHARED_SECRET}",
+		"TimeoutMilliseconds": 45000
+	},
+
+	"Corporal": {
+		"UserID": "@matrix-corporal:${MATRIX_SERVER_NAME}"
+	},
+
+	"Reconciliation": {
+		"RetryIntervalMilliseconds": 30000
+	},
+
+	"HttpGateway": {
+		"ListenAddress": "0.0.0.0:41080",
+		"TimeoutMilliseconds": 60000,
+		"InternalRESTAuth": {
+			"Enabled": true
+		}
+	},
+
+	"HttpApi": {
+		"Enabled": true,
+		"ListenAddress": "0.0.0.0:41081",
+		"AuthorizationBearerToken": "${CORPORAL_API_TOKEN}",
+		"TimeoutMilliseconds": 15000
+	},
+
+	"PolicyProvider": {
+		"Type": "static_file",
+		"Path": "/policy.json"
+	},
+
+	"Misc": {
+		"Debug": false
+	}
+}

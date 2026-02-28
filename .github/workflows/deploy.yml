@@ -1,0 +1,140 @@
+name: Deploy to Docker
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Target"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - "production"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  # TODO: Update with your GitHub username or organization
+  GHCR_ORG: "dabblingwithcode"
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./etc/docker/Dockerfile
+          push: true
+          tags: ghcr.io/${{ env.GHCR_ORG }}/matrix-corporal:latest
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+
+  deploy:
+    needs: build-and-push-image
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install SSH keys
+        run: |
+          install -m 600 -D /dev/null ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Add SSH key to the agent
+        run: |
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
+
+      - name: Test SSH connection
+        run: >
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa
+          ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}
+          "echo SSH connection successful"
+
+      - name: Substitute secrets in Synapse config
+        run: |
+          export MATRIX_SERVER_NAME="${{ secrets.MATRIX_SERVER_NAME }}"
+          export MATRIX_AUTH_SHARED_SECRET="${{ secrets.MATRIX_AUTH_SHARED_SECRET }}"
+          export MATRIX_REGISTRATION_SHARED_SECRET="${{ secrets.MATRIX_REGISTRATION_SHARED_SECRET }}"
+          export MATRIX_MACAROON_SECRET_KEY="${{ secrets.MATRIX_MACAROON_SECRET_KEY }}"
+          export MATRIX_FORM_SECRET="${{ secrets.MATRIX_FORM_SECRET }}"
+          export POSTGRES_USER="${{ secrets.POSTGRES_USER }}"
+          export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
+          export POSTGRES_DB="${{ secrets.POSTGRES_DB }}"
+          envsubst < etc/docker/synapse/homeserver.production.yaml > etc/docker/synapse/homeserver.production.yaml.out
+          mv etc/docker/synapse/homeserver.production.yaml.out etc/docker/synapse/homeserver.production.yaml
+
+      - name: Substitute secrets in matrix-corporal config
+        run: |
+          export MATRIX_SERVER_NAME="${{ secrets.MATRIX_SERVER_NAME }}"
+          export MATRIX_AUTH_SHARED_SECRET="${{ secrets.MATRIX_AUTH_SHARED_SECRET }}"
+          export MATRIX_REGISTRATION_SHARED_SECRET="${{ secrets.MATRIX_REGISTRATION_SHARED_SECRET }}"
+          export CORPORAL_API_TOKEN="${{ secrets.CORPORAL_API_TOKEN }}"
+          envsubst < etc/docker/corporal/config.production.json > etc/docker/corporal/config.production.json.out
+          mv etc/docker/corporal/config.production.json.out etc/docker/corporal/config.production.json
+
+      - name: Copy deployment files to VPS
+        run: |
+          rsync -avz --delete \
+            --exclude='synapse/signing.key' \
+            -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
+            etc/docker/ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/matrix-corporal/docker/
+
+          rsync -avz \
+            -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
+            etc/services/shared_secret_authenticator.py \
+            etc/services/rest_auth_provider.py \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/matrix-corporal/docker/
+
+      - name: Pull images and start services on VPS
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin && \
+             cd ~/matrix-corporal/docker && \
+             POSTGRES_USER='${{ secrets.POSTGRES_USER }}' \
+             POSTGRES_PASSWORD='${{ secrets.POSTGRES_PASSWORD }}' \
+             POSTGRES_DB='${{ secrets.POSTGRES_DB }}' \
+             MATRIX_SERVER_NAME='${{ secrets.MATRIX_SERVER_NAME }}' \
+             ACME_EMAIL='${{ secrets.ACME_EMAIL }}' \
+             GHCR_ORG='${{ env.GHCR_ORG }}' \
+             docker compose -f compose.production.yml -p matrix-corporal pull && \
+             POSTGRES_USER='${{ secrets.POSTGRES_USER }}' \
+             POSTGRES_PASSWORD='${{ secrets.POSTGRES_PASSWORD }}' \
+             POSTGRES_DB='${{ secrets.POSTGRES_DB }}' \
+             MATRIX_SERVER_NAME='${{ secrets.MATRIX_SERVER_NAME }}' \
+             ACME_EMAIL='${{ secrets.ACME_EMAIL }}' \
+             GHCR_ORG='${{ env.GHCR_ORG }}' \
+             docker compose -f compose.production.yml -p matrix-corporal up -d"
+
+      - name: Cleanup
+        run: rm -rf ~/.ssh

@@ -1,0 +1,82 @@
+services:
+  traefik:
+    image: docker.io/traefik:v3.3
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt_data:/letsencrypt
+    restart: unless-stopped
+
+  postgres:
+    image: docker.io/postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_INITDB_ARGS: --lc-collate C --lc-ctype C --encoding UTF8
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  synapse:
+    image: docker.io/matrixdotorg/synapse:v1.136.0
+    entrypoint: python
+    command: "-m synapse.app.homeserver -c /data/homeserver.yaml"
+    depends_on:
+      - postgres
+    volumes:
+      - synapse_data:/data
+      - synapse_media:/media_store
+      - ./synapse/homeserver.production.yaml:/data/homeserver.yaml:ro
+      - ./synapse/log.config:/data/log.config:ro
+      - ./shared_secret_authenticator.py:/usr/local/lib/python3.12/site-packages/shared_secret_authenticator.py:ro
+      - ./rest_auth_provider.py:/usr/local/lib/python3.12/site-packages/rest_auth_provider.py:ro
+    restart: unless-stopped
+
+  element-web:
+    image: docker.io/vectorim/element-web:v1.11.109
+    volumes:
+      - ./element-web/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /dev/null:/etc/nginx/conf.d/default.conf:ro
+      - ./element-web/config.production.json:/app/config.json:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.element.rule=Host(`element.${MATRIX_SERVER_NAME}`)
+      - traefik.http.routers.element.entrypoints=websecure
+      - traefik.http.routers.element.tls.certresolver=letsencrypt
+      - traefik.http.services.element.loadbalancer.server.port=8080
+    restart: unless-stopped
+
+  matrix-corporal:
+    image: ghcr.io/${GHCR_ORG}/matrix-corporal:latest
+    depends_on:
+      - synapse
+    volumes:
+      - ./corporal/config.production.json:/config.json:ro
+      - ./corporal/policy.json:/policy.json:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.matrix.rule=Host(`matrix.${MATRIX_SERVER_NAME}`)
+      - traefik.http.routers.matrix.entrypoints=websecure
+      - traefik.http.routers.matrix.tls.certresolver=letsencrypt
+      - traefik.http.services.matrix.loadbalancer.server.port=41080
+    restart: unless-stopped
+
+volumes:
+  letsencrypt_data:
+  postgres_data:
+  synapse_data:
+  synapse_media:
