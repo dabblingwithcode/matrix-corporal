@@ -69,11 +69,13 @@ services:
       - traefik.enable=true
       - traefik.http.routers.matrix.rule=Host(`matrix.${MATRIX_SERVER_NAME}`)
       - traefik.http.routers.matrix.priority=1
+      - traefik.http.routers.matrix.service=matrix
       - traefik.http.routers.matrix.entrypoints=websecure
       - traefik.http.routers.matrix.tls.certresolver=letsencrypt
       - traefik.http.services.matrix.loadbalancer.server.port=41080
       - traefik.http.routers.matrix-api.rule=Host(`matrix.${MATRIX_SERVER_NAME}`) && PathPrefix(`/_matrix/corporal`)
       - traefik.http.routers.matrix-api.priority=100
+      - traefik.http.routers.matrix-api.service=matrix-api
       - traefik.http.routers.matrix-api.entrypoints=websecure
       - traefik.http.routers.matrix-api.tls.certresolver=letsencrypt
       - traefik.http.services.matrix-api.loadbalancer.server.port=41081
