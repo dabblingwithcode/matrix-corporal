@@ -1,10 +1,10 @@
 {
-    "default_hs_url": "https://matrix.schulpostmedien-sandkasten.de",
+    "default_hs_url": "https://matrix.${MATRIX_SERVER_NAME}",
     "default_is_url": "https://vector.im",
     "brand": "Element",
     "roomDirectory": {
         "servers": [
-            "schulpostmedien-sandkasten.de"
+            "${MATRIX_SERVER_NAME}"
         ]
     }
 }
