@@ -142,7 +142,7 @@ jobs:
              MATRIX_SERVER_NAME='${{ secrets.MATRIX_SERVER_NAME }}' \
              ACME_EMAIL='${{ secrets.ACME_EMAIL }}' \
              GHCR_ORG='${{ env.GHCR_ORG }}' \
-             docker compose -f compose.production.yml -p matrix-corporal up -d"
+             docker compose -f compose.production.yml -p matrix-corporal up -d --force-recreate"
 
       - name: Check container status
         run: |
