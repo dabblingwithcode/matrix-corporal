@@ -103,6 +103,15 @@ jobs:
           envsubst < etc/docker/corporal/config.production.json > etc/docker/corporal/config.production.json.out
           mv etc/docker/corporal/config.production.json.out etc/docker/corporal/config.production.json
 
+      - name: Substitute secrets in matrix-corporal policy
+        run: |
+          export MATRIX_ADMIN_ID="${{ secrets.MATRIX_ADMIN_ID }}"
+          export MATRIX_SERVER_NAME="${{ secrets.MATRIX_SERVER_NAME }}"
+          ADMIN_MATRIX_USER_ID_REGEX=$(echo "@${MATRIX_ADMIN_ID}:${MATRIX_SERVER_NAME}" | sed 's/\./\\./g')
+          export ADMIN_MATRIX_USER_ID_REGEX
+          envsubst < etc/docker/corporal/policy.json > etc/docker/corporal/policy.json.out
+          mv etc/docker/corporal/policy.json.out etc/docker/corporal/policy.json
+
       - name: Substitute secrets in Element-web config
         run: |
           export MATRIX_SERVER_NAME="${{ secrets.MATRIX_SERVER_NAME }}"

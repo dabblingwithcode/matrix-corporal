@@ -79,6 +79,40 @@ if ($_SERVER['REQUEST_URI'] === '/respond-with-something') {
 }
 
 
+// Reject room invitations sent to the admin user. Set ADMIN_MATRIX_USER_ID in the environment
+// (e.g. @admin:your.server) to the full MXID to protect. If unset, all invites pass through.
+if (parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) === '/reject-invite-to-admin') {
+	$payload = file_get_contents('php://input');
+	$data = json_decode($payload, true);
+	$adminUserId = getenv('ADMIN_MATRIX_USER_ID');
+	if ($adminUserId === false) {
+		$adminUserId = '';
+	}
+	$isInviteToAdmin = false;
+	if ($adminUserId !== '' && isset($data['request']['path']) && isset($data['request']['payload'])) {
+		$path = $data['request']['path'];
+		if (str_ends_with($path, '/invite')) {
+			$body = json_decode($data['request']['payload'], true);
+			if (is_array($body) && isset($body['user_id']) && $body['user_id'] === $adminUserId) {
+				$isInviteToAdmin = true;
+			}
+		}
+	}
+	if ($isInviteToAdmin) {
+		$respondWithJsonAndExit([
+			'id' => 'reject-invite-to-admin',
+			'action' => 'reject',
+			'responseStatusCode' => 403,
+			'rejectionErrorCode' => 'M_FORBIDDEN',
+			'rejectionErrorMessage' => 'Inviting the admin user to rooms is not allowed.',
+		]);
+	}
+	$respondWithJsonAndExit([
+		'id' => 'allow-invite',
+		'action' => 'pass.unmodified',
+	]);
+}
+
 if ($_SERVER['REQUEST_URI'] === '/dump') {
 	$payload = file_get_contents('php://input');
 

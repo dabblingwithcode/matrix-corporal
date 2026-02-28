@@ -12,9 +12,21 @@
 
 	"managedRoomIds": [],
 
-	"hooks": [],
+	"hooks": [
+		{
+			"id": "prevent-inviting-admin-user",
+			"eventType": "beforeAuthenticatedRequest",
+			"matchRules": [
+				{"type": "method", "regex": "POST"},
+				{"type": "route", "regex": "^/_matrix/client/r0/rooms/[^/]+/invite$"},
+				{"type": "requestBody", "regex": "\"user_id\"\\s*:\\s*\"${ADMIN_MATRIX_USER_ID_REGEX}\""}
+			],
+			"action": "reject",
+			"responseStatusCode": 403,
+			"rejectionErrorCode": "M_FORBIDDEN",
+			"rejectionErrorMessage": "Inviting the admin user to rooms is not allowed."
+		}
+	],
 
-	"users": [
-
-	]
+	"users": []
 }

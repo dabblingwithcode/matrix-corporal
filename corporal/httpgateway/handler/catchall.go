@@ -70,6 +70,14 @@ func (me *catchAllHandler) actionCatchAll(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	// Buffer request body for methods that may have one, so hooks can use requestBody match rules.
+	// GetRequestBody reads and restores r.Body so the proxy can still forward it.
+	if r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH" {
+		if bodyBytes, err := httphelp.GetRequestBody(r); err == nil {
+			r = r.WithContext(context.WithValue(r.Context(), hook.RequestBodyContextKey, bodyBytes))
+		}
+	}
+
 	httpResponseModifierFuncs := make([]hook.HttpResponseModifierFunc, 0)
 
 	// This "runs" both before and after hooks.

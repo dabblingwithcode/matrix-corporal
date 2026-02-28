@@ -235,6 +235,25 @@ Below are the `type` values that we support:
 	}
 	```
 
+- `type = requestBody` - specifies that a regular expression (in the `regex` field) must match against the raw request body (e.g. the JSON payload). Only requests with a body (POST, PUT, PATCH) have the body buffered for matching; if there is no body in context, the rule does not match.
+
+	Example (reject room invitations sent to the admin user; replace `@admin:your\.server` with your admin's full MXID, escaping dots in the server part). In this repo, the value is substituted at deploy time from the GitHub secrets `MATRIX_ADMIN_ID` and `MATRIX_SERVER_NAME`, so the committed policy uses `${ADMIN_MATRIX_USER_ID_REGEX}` and no manual edit is needed.
+	```json
+	{
+		"id": "prevent-inviting-admin-user",
+		"eventType": "beforeAuthenticatedRequest",
+		"matchRules": [
+			{"type": "method", "regex": "POST"},
+			{"type": "route", "regex": "^/_matrix/client/r0/rooms/[^/]+/invite$"},
+			{"type": "requestBody", "regex": "\"user_id\"\\s*:\\s*\"@admin:your\\.server\""}
+		],
+		"action": "reject",
+		"responseStatusCode": 403,
+		"rejectionErrorCode": "M_FORBIDDEN",
+		"rejectionErrorMessage": "Inviting the admin user to rooms is not allowed."
+	}
+	```
+
 ## Actions
 
 After `matrix-corporal` has determined that a given hook is eligible for running (matches the [event type](#event-types) and other [matching rules](#matching-rules)), the next step is actually executing it.
