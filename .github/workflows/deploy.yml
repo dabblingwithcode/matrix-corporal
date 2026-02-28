@@ -147,7 +147,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
             'for i in $(seq 1 30); do
-               if docker exec matrix-corporal-synapse-1 wget -q --spider http://localhost:8008/_matrix/client/versions 2>/dev/null; then
+               if docker exec matrix-corporal-synapse-1 python -c "import urllib.request; urllib.request.urlopen(\"http://localhost:8008/_matrix/client/versions\")" 2>/dev/null; then
                  echo "Synapse is ready"; exit 0
                fi
                echo "Waiting for Synapse... ($i/30)"; sleep 2
