@@ -142,6 +142,23 @@ jobs:
              GHCR_ORG='${{ env.GHCR_ORG }}' \
              docker compose -f compose.production.yml -p matrix-corporal up -d"
 
+      - name: Check container status
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            'cd ~/matrix-corporal/docker && \
+             POSTGRES_USER="${{ secrets.POSTGRES_USER }}" \
+             POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
+             POSTGRES_DB="${{ secrets.POSTGRES_DB }}" \
+             MATRIX_SERVER_NAME="${{ secrets.MATRIX_SERVER_NAME }}" \
+             ACME_EMAIL="${{ secrets.ACME_EMAIL }}" \
+             GHCR_ORG="${{ env.GHCR_ORG }}" \
+             docker compose -f compose.production.yml -p matrix-corporal ps && \
+             echo "--- Element-web logs ---" && \
+             docker logs matrix-corporal-element-web-1 --tail 20 2>&1 && \
+             echo "--- Traefik routers ---" && \
+             docker logs matrix-corporal-traefik-1 --tail 30 2>&1 | grep -i "element\|error\|router" || true'
+
       - name: Wait for Synapse to be ready
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
@@ -158,54 +175,20 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            'ADMIN_ID="${{ secrets.MATRIX_ADMIN_ID }}"
-             ADMIN_PW="${{ secrets.MATRIX_ADMIN_PASSWORD }}"
-             CONTAINER="matrix-corporal-synapse-1"
-
-             RESULT=$(docker exec "$CONTAINER" \
-               python -c "
-             import requests, sys
-             try:
-                 r = requests.get(\"http://localhost:8008/_synapse/admin/v2/users/@${ADMIN_ID}:${{ secrets.MATRIX_SERVER_NAME }}\",
-                     headers={\"Authorization\": \"Bearer invalid\"})
-                 if r.status_code == 401:
-                     print(\"need_auth\")
-                 elif r.status_code == 200:
-                     print(\"exists\")
-                 else:
-                     print(\"unknown\")
-             except Exception as e:
-                 print(\"error\")
-             " 2>/dev/null || echo "error")
-
-             if docker exec "$CONTAINER" python -c "
-             import requests, json, hashlib, hmac
-             reg_secret = \"${{ secrets.MATRIX_REGISTRATION_SHARED_SECRET }}\"
-             r = requests.get(\"http://localhost:8008/_synapse/admin/v1/register\")
-             nonce = r.json()[\"nonce\"]
-             mac = hmac.new(reg_secret.encode(), digestmod=hashlib.sha1)
-             mac.update(nonce.encode())
-             mac.update(b\"\\x00\")
-             mac.update(\"${ADMIN_ID}\".encode())
-             mac.update(b\"\\x00\")
-             mac.update(\"${ADMIN_PW}\".encode())
-             mac.update(b\"\\x00\")
-             mac.update(b\"admin\")
-             mac_hex = mac.hexdigest()
-             data = {\"nonce\": nonce, \"username\": \"${ADMIN_ID}\", \"password\": \"${ADMIN_PW}\", \"admin\": True, \"mac\": mac_hex}
-             r2 = requests.post(\"http://localhost:8008/_synapse/admin/v1/register\", json=data)
-             if r2.status_code == 200:
-                 print(\"Admin user created successfully\")
-             elif \"User ID already taken\" in r2.text:
-                 print(\"Admin user already exists - skipping\")
-             else:
-                 print(f\"Registration response: {r2.status_code} {r2.text}\")
-                 if r2.status_code >= 400 and \"already taken\" not in r2.text:
-                     exit(1)
-             "; then
-               echo "Admin user step completed"
+            'CONTAINER="matrix-corporal-synapse-1"
+             OUTPUT=$(docker exec "$CONTAINER" \
+               register_new_matrix_user \
+               -a \
+               -u "${{ secrets.MATRIX_ADMIN_ID }}" \
+               -p "${{ secrets.MATRIX_ADMIN_PASSWORD }}" \
+               -c /data/homeserver.yaml \
+               http://localhost:8008 2>&1) || true
+             if echo "$OUTPUT" | grep -q "already taken"; then
+               echo "Admin user already exists - skipping"
+             elif echo "$OUTPUT" | grep -q "Success"; then
+               echo "Admin user created successfully"
              else
-               echo "Warning: Admin user creation had issues, check logs"
+               echo "Registration output: $OUTPUT"
              fi'
 
       - name: Cleanup
