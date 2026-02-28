@@ -2,7 +2,7 @@ services:
   traefik:
     image: docker.io/traefik:v3.3
     command:
-      - --log.level=INFO
+      - --log.level=DEBUG
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
       - --entrypoints.web.address=:80
