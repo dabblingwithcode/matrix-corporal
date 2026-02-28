@@ -49,15 +49,13 @@ services:
   element-web:
     image: docker.io/vectorim/element-web:v1.11.109
     volumes:
-      - ./element-web/nginx.conf:/etc/nginx/nginx.conf:ro
-      - /dev/null:/etc/nginx/conf.d/default.conf:ro
       - ./element-web/config.production.json:/app/config.json:ro
     labels:
       - traefik.enable=true
       - traefik.http.routers.element.rule=Host(`element.${MATRIX_SERVER_NAME}`)
       - traefik.http.routers.element.entrypoints=websecure
       - traefik.http.routers.element.tls.certresolver=letsencrypt
-      - traefik.http.services.element.loadbalancer.server.port=8080
+      - traefik.http.services.element.loadbalancer.server.port=80
     restart: unless-stopped
 
   matrix-corporal:
