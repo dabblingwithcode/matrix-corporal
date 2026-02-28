@@ -8,68 +8,69 @@ import (
 	"strings"
 )
 
-// DecryptAESCBC decrypts AES CBC encrypted data with UTF-8 key and IV
-func DecryptAESCBC(encryptedData, key, iv string) (string, error) {
-	// Decode base64 ciphertext
-	ciphertext, err := base64.StdEncoding.DecodeString(encryptedData)
+// ProcessEncryptedUserAuth handles the full decryption flow
+func ProcessEncryptedUserAuth(fullPayload, keyStr string) (username, password string, err error) {
+	const separator = "*"
+	key := []byte(keyStr)
+
+	// 1. Split the payload by the constant separator
+	parts := strings.Split(fullPayload, separator)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid payload: expected 2 parts separated by '*', got %d", len(parts))
+	}
+
+	// 2. Decrypt the first part (Username)
+	userBytes, err := decryptInternal(parts[0], key)
 	if err != nil {
-		return "", fmt.Errorf("failed to decode ciphertext: %v", err)
+		return "", "", fmt.Errorf("username decryption failed: %v", err)
 	}
 
-	// Convert UTF-8 key and IV to bytes
-	keyBytes := []byte(key)
-	ivBytes := []byte(iv)
-
-	// Validate key length (AES-256 requires 32 bytes)
-	if len(keyBytes) != 32 {
-		return "", fmt.Errorf("invalid key length: expected 32 bytes for AES-256, got %d", len(keyBytes))
+	// 3. Decrypt the second part (Password)
+	passBytes, err := decryptInternal(parts[1], key)
+	if err != nil {
+		return "", "", fmt.Errorf("password decryption failed: %v", err)
 	}
 
-	// Validate IV length (AES requires 16 bytes)
-	if len(ivBytes) != 16 {
-		return "", fmt.Errorf("invalid IV length: expected 16 bytes, got %d", len(ivBytes))
+	return string(userBytes), string(passBytes), nil
+}
+
+// Internal helper to handle IV extraction and CBC decryption
+func decryptInternal(b64Data string, key []byte) ([]byte, error) {
+	data, err := base64.StdEncoding.DecodeString(b64Data)
+	if err != nil {
+		return nil, err
 	}
 
-	// CBC requires ciphertext length to be a multiple of block size; otherwise CryptBlocks panics
+	if len(data) < 16 {
+		return nil, fmt.Errorf("payload too short for IV")
+	}
+
+	iv := data[:16]
+	ciphertext := data[16:]
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(ciphertext)%aes.BlockSize != 0 {
-		return "", fmt.Errorf("ciphertext length %d is not a multiple of block size (%d)", len(ciphertext), aes.BlockSize)
+		return nil, fmt.Errorf("ciphertext is not a multiple of block size")
 	}
 
-	// Create cipher block
-	block, err := aes.NewCipher(keyBytes)
-	if err != nil {
-		return "", fmt.Errorf("failed to create cipher: %v", err)
-	}
-
-	// Create CBC mode
-	mode := cipher.NewCBCDecrypter(block, ivBytes)
-
-	// Decrypt
+	mode := cipher.NewCBCDecrypter(block, iv)
 	decrypted := make([]byte, len(ciphertext))
 	mode.CryptBlocks(decrypted, ciphertext)
 
-	// Remove PKCS7 padding
-	padding := int(decrypted[len(decrypted)-1])
-	if padding > len(decrypted) || padding == 0 {
-		return "", fmt.Errorf("invalid padding")
-	}
-
-	return string(decrypted[:len(decrypted)-padding]), nil
+	return unpadPKCS7(decrypted)
 }
 
-// ProcessEncryptedUserAuth handles the encrypted user authentication
-func ProcessEncryptedUserAuth(credentials, key, iv string) (username, passwordFirstPart string, err error) {
-	// Decrypt the credentials
-	decryptedCredentials, err := DecryptAESCBC(credentials, key, iv)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to decrypt credentials: %v", err)
+func unpadPKCS7(data []byte) ([]byte, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("empty data")
 	}
-
-	// Split the decrypted credentials by '*'
-	parts := strings.Split(decryptedCredentials, "*")
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid encrypted payload format: expected 2 parts separated by '*', got %d", len(parts))
+	padding := int(data[len(data)-1])
+	if padding < 1 || padding > 16 {
+		return nil, fmt.Errorf("invalid padding")
 	}
-
-	return parts[0], parts[1], nil
+	return data[:len(data)-padding], nil
 }

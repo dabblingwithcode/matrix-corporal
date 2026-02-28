@@ -55,7 +55,7 @@ func (me *PasswordChangeInterceptor) Intercept(r *http.Request) InterceptorRespo
 		return createInterceptorErrorResponse(loggingContextFields, matrix.ErrorBadJson, "Invalid auth.identifier")
 	}
 
-	decryptedUsername, decryptedPassword, err := util.ProcessEncryptedUserAuth(payload.Auth.Password, me.config.DecryptKey, me.config.DecryptIv)
+	decryptedUsername, decryptedPassword, err := util.ProcessEncryptedUserAuth(payload.Auth.Password, me.config.DecryptKey)
 	if err != nil {
 		logrus.Errorf("Failed to process encrypted user auth: %v", err)
 		return createInterceptorErrorResponse(loggingContextFields, matrix.ErrorBadJson, "Failed to process authentication")

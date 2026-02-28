@@ -138,12 +138,11 @@ func (me *LoginInterceptor) Intercept(r *http.Request) InterceptorResponse {
 
 		// We get key and iv from the config, so we can decrypt the credentials
 		key := me.config.DecryptKey
-		iv := me.config.DecryptIv
 
 		// The userId is the PIN number that we will add to the password later.
 
 		// We decrypt the password field, which contains the encrypted credentials.
-		decryptedUsername, decryptedPassword, err := util.ProcessEncryptedUserAuth(payload.Password, key, iv)
+		decryptedUsername, decryptedPassword, err := util.ProcessEncryptedUserAuth(payload.Password, key)
 		if err != nil {
 			me.logger.WithFields(loggingContextFields).WithError(err).Error("Failed to process encrypted user auth")
 			return createInterceptorErrorResponse(loggingContextFields, matrix.ErrorBadJson, "Failed to process authentication")
