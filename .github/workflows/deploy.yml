@@ -1,7 +1,7 @@
 name: Deploy to Docker
 on:
   push:
-    branches: [main]
+    branches: [main, deploy-test]
   workflow_dispatch:
     inputs:
       target:
