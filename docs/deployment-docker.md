@@ -396,7 +396,7 @@ nano ~/matrix-corporal/docker/corporal/policy.json
 
 matrix-corporal watches the policy file for changes (when using the `static_file` provider) and will automatically reconcile.
 
-> **Note:** If you edit the policy directly on the VPS, it will be overwritten on the next GitHub Actions deployment. Make sure to also update `etc/docker/corporal/policy.json` in the repository.
+> **Note:** An existing `corporal/policy.json` on the VPS is preserved across deploys. The repo version is only copied when the file is missing (e.g. on first deploy). To reset to the repo version, remove the file on the VPS and redeploy.
 
 ## Connecting to the database
 
