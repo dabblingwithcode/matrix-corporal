@@ -7,12 +7,6 @@ import (
 	"regexp"
 )
 
-// RequestBodyContextKey is the context key for the buffered request body ([]byte).
-// The gateway sets it for methods that may have a body so requestBody match rules can run.
-type requestBodyContextKeyType struct{}
-
-var RequestBodyContextKey = requestBodyContextKeyType{}
-
 var (
 	// HookMatchRuleTypeURLPath is a match rule type that requires a match against the incoming HTTP request's HTTP Method (GET, POST, etc)
 	HookMatchRuleTypeHTTPMethod = "method"
@@ -27,17 +21,12 @@ var (
 
 	// HookMatchRuleTypeURLPath is a match rule type that requires a match against the full Matrix ID of the authenticated user.
 	HookMatchRuleTypeMatrixUserID = "matrixUserID"
-
-	// HookMatchRuleTypeRequestBody is a match rule type that requires a match against the raw request body (e.g. JSON payload).
-	// The body must have been buffered and set on the request context by the gateway; otherwise the rule does not match.
-	HookMatchRuleTypeRequestBody = "requestBody"
 )
 
 var knownHookMatchRuleTypes = []string{
 	HookMatchRuleTypeHTTPMethod,
 	HookMatchRuleTypeURLPath,
 	HookMatchRuleTypeMatrixUserID,
-	HookMatchRuleTypeRequestBody,
 }
 
 type HookMatchRule struct {
@@ -95,20 +84,6 @@ func (me *HookMatchRule) matchRequestAgainstRules(request *http.Request) (bool, 
 			if !me.regexCompiled.MatchString(matrixUserIDString) {
 				return false, nil
 			}
-		}
-	}
-
-	if me.Type == HookMatchRuleTypeRequestBody {
-		bodyInterface := request.Context().Value(RequestBodyContextKey)
-		if bodyInterface == nil {
-			return false, nil
-		}
-		bodyBytes, ok := bodyInterface.([]byte)
-		if !ok {
-			return false, nil
-		}
-		if !me.regexCompiled.Match(bodyBytes) {
-			return false, nil
 		}
 	}
 
