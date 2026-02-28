@@ -67,7 +67,7 @@ services:
       - ./corporal/policy.json:/policy.json:ro
     labels:
       - traefik.enable=true
-      - traefik.http.routers.matrix.rule=Host(`matrix.${MATRIX_SERVER_NAME}`)
+      - traefik.http.routers.matrix.rule=Host(`matrix.${MATRIX_SERVER_NAME}`) && !PathPrefix(`/_matrix/corporal`)
       - traefik.http.routers.matrix.priority=1
       - traefik.http.routers.matrix.service=matrix
       - traefik.http.routers.matrix.entrypoints=websecure
