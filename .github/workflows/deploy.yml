@@ -123,6 +123,13 @@ jobs:
             etc/services/rest_auth_provider.py \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/matrix-corporal/docker/
 
+      - name: Clear stale ACME data for fresh certificate requests
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            'docker rm -f matrix-corporal-traefik-1 2>/dev/null || true && \
+             docker volume rm matrix-corporal_letsencrypt_data 2>/dev/null || true'
+
       - name: Pull images and start services on VPS
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
