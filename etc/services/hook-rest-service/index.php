@@ -113,6 +113,35 @@ if (parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) === '/reject-invite-to-admi
 	]);
 }
 
+// Reject room invitations to the user with localpart "matrix-corporal" (any server).
+if (parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) === '/reject-invite-to-matrix-corporal') {
+	$payload = file_get_contents('php://input');
+	$data = json_decode($payload, true);
+	$isInviteToMatrixCorporal = false;
+	if (isset($data['request']['path']) && isset($data['request']['payload'])) {
+		$path = $data['request']['path'];
+		if (str_ends_with($path, '/invite')) {
+			$body = json_decode($data['request']['payload'], true);
+			if (is_array($body) && isset($body['user_id']) && preg_match('/^@matrix-corporal:/', $body['user_id'])) {
+				$isInviteToMatrixCorporal = true;
+			}
+		}
+	}
+	if ($isInviteToMatrixCorporal) {
+		$respondWithJsonAndExit([
+			'id' => 'reject-invite-to-matrix-corporal',
+			'action' => 'reject',
+			'responseStatusCode' => 403,
+			'rejectionErrorCode' => 'M_FORBIDDEN',
+			'rejectionErrorMessage' => 'Unterhaltungen mit dem Admin-Bot sind nicht möglich.',
+		]);
+	}
+	$respondWithJsonAndExit([
+		'id' => 'allow-invite',
+		'action' => 'pass.unmodified',
+	]);
+}
+
 if ($_SERVER['REQUEST_URI'] === '/dump') {
 	$payload = file_get_contents('php://input');
 
