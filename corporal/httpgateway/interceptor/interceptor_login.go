@@ -178,6 +178,17 @@ func (me *LoginInterceptor) Intercept(r *http.Request) InterceptorResponse {
 	if userPolicy == nil {
 		// Not a user we manage.
 		// Let it go through and let the upstream server's policies apply, whatever they may be.
+		// If this was an encrypted login, send decrypted body and rewrite path to /login so upstream receives a normal login.
+		if strings.Contains(r.URL.Path, "/encryptedLogin") {
+			newBodyBytes, err := json.Marshal(payload)
+			if err != nil {
+				return createInterceptorErrorResponse(loggingContextFields, matrix.ErrorUnknown, "Internal error")
+			}
+			r.Body = io.NopCloser(bytes.NewReader(newBodyBytes))
+			r.ContentLength = int64(len(newBodyBytes))
+			r.URL.Path = strings.Replace(strings.Replace(r.URL.Path, "/encryptedLogin/", "/login", 1), "/encryptedLogin", "/login", 1)
+			r.RequestURI = strings.Replace(strings.Replace(r.RequestURI, "/encryptedLogin/", "/login", 1), "/encryptedLogin", "/login", 1)
+		}
 		return InterceptorResponse{
 			Result:               InterceptorResultProxy,
 			LoggingContextFields: loggingContextFields,
@@ -206,10 +217,8 @@ func (me *LoginInterceptor) Intercept(r *http.Request) InterceptorResponse {
 
 		// If encrypted request, we will also have to redirect the request to the Matrix server's /login API.
 		if strings.Contains(r.URL.Path, "/encryptedLogin") {
-
-			r.URL.Path = strings.Replace(r.URL.Path, "/encryptedLogin", "/login", 1)
-			r.RequestURI = strings.Replace(r.RequestURI, "/encryptedLogin", "/login", 1)
-
+			r.URL.Path = strings.Replace(strings.Replace(r.URL.Path, "/encryptedLogin/", "/login", 1), "/encryptedLogin", "/login", 1)
+			r.RequestURI = strings.Replace(strings.Replace(r.RequestURI, "/encryptedLogin/", "/login", 1), "/encryptedLogin", "/login", 1)
 		}
 		return InterceptorResponse{
 			Result:               InterceptorResultProxy,
@@ -251,8 +260,8 @@ func (me *LoginInterceptor) Intercept(r *http.Request) InterceptorResponse {
 
 	// Rewrite path so upstream receives /login, not /encryptedLogin
 	if strings.Contains(r.URL.Path, "/encryptedLogin") {
-		r.URL.Path = strings.Replace(r.URL.Path, "/encryptedLogin", "/login", 1)
-		r.RequestURI = strings.Replace(r.RequestURI, "/encryptedLogin", "/login", 1)
+		r.URL.Path = strings.Replace(strings.Replace(r.URL.Path, "/encryptedLogin/", "/login", 1), "/encryptedLogin", "/login", 1)
+		r.RequestURI = strings.Replace(strings.Replace(r.RequestURI, "/encryptedLogin/", "/login", 1), "/encryptedLogin", "/login", 1)
 	}
 
 	return InterceptorResponse{

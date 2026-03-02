@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"encoding/json"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -46,6 +47,15 @@ func (me *Store) Set(policy *Policy) error {
 	defer me.lockPolicy.Unlock()
 
 	me.policy = policy
+
+	//TODO: remove after debugging
+	if policyJSON, err := json.Marshal(policy); err == nil {
+		//TODO: remove after debugging
+		me.logger.WithField("policy", string(policyJSON)).Info("New policy received and stored")
+	} else {
+		//TODO: remove after debugging
+		me.logger.WithError(err).Warn("New policy received and stored; could not marshal for debug log")
+	}
 
 	for _, channel := range me.listenerChannels {
 		// Do it asynchronously. We don't want to block here..
