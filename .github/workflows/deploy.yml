@@ -112,6 +112,7 @@ jobs:
         run: |
           rsync -avz --delete \
             --exclude='synapse/signing.key' \
+
             -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
             etc/docker/ \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/matrix-corporal/docker/
@@ -126,6 +127,11 @@ jobs:
             etc/services/shared_secret_authenticator.py \
             etc/services/rest_auth_provider.py \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/matrix-corporal/docker/
+
+          rsync -avz \
+            -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
+            etc/services/hook-rest-service/ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/matrix-corporal/docker/hook-rest-service/
 
       - name: Pull images and start services on VPS
         run: |
