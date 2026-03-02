@@ -3,7 +3,7 @@
   "flags": {
     "allowCustomUserDisplayNames": false,
     "allowCustomUserAvatars": true,
-    "allowCustomPassthroughUserPasswords": false,
+    "allowCustomPassthroughUserPasswords": true,
     "allowUnauthenticatedPasswordResets": false,
     "forbidRoomCreation": false,
     "forbidEncryptedRoomCreation": false,

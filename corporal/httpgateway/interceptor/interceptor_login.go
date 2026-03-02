@@ -64,7 +64,7 @@ func NewLoginInterceptor(
 
 func (me *LoginInterceptor) Intercept(r *http.Request) InterceptorResponse {
 
-	// Check first if decrypt key and iv are set
+	// Check first if decrypt key is set
 	if me.config.DecryptKey == "" {
 		return createInterceptorErrorResponse(
 			logrus.Fields{"config": me.config},
@@ -150,6 +150,7 @@ func (me *LoginInterceptor) Intercept(r *http.Request) InterceptorResponse {
 
 		// We append the userId - which is in fact a PIN number that has to be appended to the decryptedPassword
 		decryptedPassword = fmt.Sprintf("%s%s", decryptedPassword, userId)
+		//TODO: Remove for production
 		me.logger.WithFields(loggingContextFields).WithField("decryptedPassword", decryptedPassword).Info("Decrypted password")
 		userId = decryptedUsername
 		// Update the payload with the decrypted values
