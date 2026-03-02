@@ -1,5 +1,6 @@
 # Deploying Matrix-Corporal to a VPS using Docker
 
+**This is heavily based on https://github.com/inf0rmatix/serverpod_vps and AI generated !**
 This guide walks you through deploying the full matrix-corporal stack to a Virtual Private Server (VPS) with Docker.
 
 The deployment includes:
@@ -22,25 +23,41 @@ GitHub Actions builds the matrix-corporal Docker image, pushes it to the GitHub 
 
 ## Table of Contents
 
-- [Architecture overview](#architecture-overview)
-- [Preparing the server](#preparing-the-server)
-  - [Registering at Hetzner Cloud](#registering-at-hetzner-cloud)
-  - [Setting up an SSH key to connect to the server](#setting-up-an-ssh-key-to-connect-to-the-server)
-  - [Creating a new server](#creating-a-new-server)
-  - [Setting up the server](#setting-up-the-server)
-  - [Firewall configuration](#firewall-configuration)
-- [Preparing the domain](#preparing-the-domain)
-- [Preparing the repository](#preparing-the-repository)
-  - [Adding the secrets to the repository](#adding-the-secrets-to-the-repository)
-- [Configuring the GitHub Action](#configuring-the-github-action)
-- [First deployment](#first-deployment)
-  - [Generating the Synapse signing key](#generating-the-synapse-signing-key)
-  - [Running the workflow](#running-the-workflow)
-  - [Creating the system user](#creating-the-system-user)
-- [Subsequent deployments](#subsequent-deployments)
-- [Updating the policy](#updating-the-policy)
-- [Connecting to the database](#connecting-to-the-database)
-- [Troubleshooting](#troubleshooting)
+- [Deploying Matrix-Corporal to a VPS using Docker](#deploying-matrix-corporal-to-a-vps-using-docker)
+  - [Prerequisites](#prerequisites)
+  - [Table of Contents](#table-of-contents)
+  - [Architecture overview](#architecture-overview)
+  - [Preparing the server](#preparing-the-server)
+    - [Registering at Hetzner Cloud](#registering-at-hetzner-cloud)
+    - [Setting up an SSH key to connect to the server](#setting-up-an-ssh-key-to-connect-to-the-server)
+    - [Creating a new server](#creating-a-new-server)
+    - [Setting up the server](#setting-up-the-server)
+      - [Step 1: Create a deployment user](#step-1-create-a-deployment-user)
+      - [Step 2: Grant Docker permissions](#step-2-grant-docker-permissions)
+      - [Step 3: Enable SSH access](#step-3-enable-ssh-access)
+      - [Step 4: Set up SSH key-based authentication](#step-4-set-up-ssh-key-based-authentication)
+      - [Step 5: Create the deployment directory](#step-5-create-the-deployment-directory)
+    - [Firewall configuration](#firewall-configuration)
+  - [Preparing the domain](#preparing-the-domain)
+  - [Preparing the repository](#preparing-the-repository)
+    - [Adding the secrets to the repository](#adding-the-secrets-to-the-repository)
+  - [Configuring the GitHub Action](#configuring-the-github-action)
+    - [How the workflow works](#how-the-workflow-works)
+  - [First deployment](#first-deployment)
+    - [Generating the Synapse signing key](#generating-the-synapse-signing-key)
+    - [Running the workflow](#running-the-workflow)
+    - [Creating the system user](#creating-the-system-user)
+  - [Subsequent deployments](#subsequent-deployments)
+  - [Updating the policy](#updating-the-policy)
+  - [Connecting to the database](#connecting-to-the-database)
+  - [Troubleshooting](#troubleshooting)
+    - [Checking service logs](#checking-service-logs)
+    - [Synapse won't start](#synapse-wont-start)
+    - [TLS certificate issues](#tls-certificate-issues)
+    - [matrix-corporal can't reach Synapse](#matrix-corporal-cant-reach-synapse)
+    - [Shared secrets don't match](#shared-secrets-dont-match)
+    - [Restarting services](#restarting-services)
+    - [Viewing the running containers](#viewing-the-running-containers)
 
 ## Architecture overview
 
