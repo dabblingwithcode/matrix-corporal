@@ -249,6 +249,12 @@ func (me *LoginInterceptor) Intercept(r *http.Request) InterceptorResponse {
 	r.Body = io.NopCloser(bytes.NewReader(newBodyBytes))
 	r.ContentLength = int64(len(newBodyBytes))
 
+	// Rewrite path so upstream receives /login, not /encryptedLogin
+	if strings.Contains(r.URL.Path, "/encryptedLogin") {
+		r.URL.Path = strings.Replace(r.URL.Path, "/encryptedLogin", "/login", 1)
+		r.RequestURI = strings.Replace(r.RequestURI, "/encryptedLogin", "/login", 1)
+	}
+
 	return InterceptorResponse{
 		Result:               InterceptorResultProxy,
 		LoggingContextFields: loggingContextFields,
