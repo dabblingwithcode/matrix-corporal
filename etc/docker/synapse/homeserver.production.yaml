@@ -48,9 +48,9 @@ uploads_path: "/tmp"
 
 room_list_publication_rules:
   - user_id: "@${MATRIX_ADMIN_ID}:${MATRIX_SERVER_NAME}"
-    action: deny
+    action: allow
 
-  - action: allow
+  - action: deny
 
 rc_message:
   per_second: 0.2

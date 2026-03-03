@@ -26,7 +26,10 @@ env:
 jobs:
   reset:
     runs-on: ubuntu-latest
-    if: github.event.inputs.reset_data == 'RESET'
+    ##- If RESET is provided as an input or the commit message contains [RESET], run the reset job
+    if: >-
+      github.event.inputs.reset_data == 'RESET' ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, '[RESET]'))
     steps:
       - name: Install SSH keys
         run: |
