@@ -29,8 +29,9 @@ func NewPasswordChangeInterceptor(config configuration.Misc) *PasswordChangeInte
 // Intercept implements interceptor.Interceptor.
 func (me *PasswordChangeInterceptor) Intercept(r *http.Request) InterceptorResponse {
 	if me.config.DecryptKey == "" {
-		return createInterceptorErrorResponse(
+		return createInterceptorErrorResponseWithStatus(
 			logrus.Fields{"config": me.config},
+			http.StatusInternalServerError,
 			matrix.ErrorUnknown,
 			"Decryption keys missing in config.json",
 		)
@@ -42,44 +43,70 @@ func (me *PasswordChangeInterceptor) Intercept(r *http.Request) InterceptorRespo
 	err := httphelp.GetJsonFromRequestBody(r, &payload)
 	if err != nil {
 		loggingContextFields["err"] = err.Error()
-		return createInterceptorErrorResponse(loggingContextFields, matrix.ErrorBadJson, "Bad input")
+		return createInterceptorErrorResponseWithStatus(loggingContextFields, http.StatusBadRequest, matrix.ErrorBadJson, "Bad input")
 	}
 
-	if payload.Auth.Password == "" {
-		return createInterceptorErrorResponse(loggingContextFields, matrix.ErrorBadJson, "Missing auth.password")
+	var authObj map[string]interface{}
+	if len(payload.Auth) == 0 {
+		return createInterceptorErrorResponseWithStatus(loggingContextFields, http.StatusBadRequest, matrix.ErrorBadJson, "Missing auth")
+	}
+	if err = json.Unmarshal(payload.Auth, &authObj); err != nil {
+		loggingContextFields["err"] = err.Error()
+		return createInterceptorErrorResponseWithStatus(loggingContextFields, http.StatusBadRequest, matrix.ErrorBadJson, "Invalid auth object")
 	}
 
-	pin, err := parseIdentifierPIN(payload.Auth.Identifier)
+	encryptedPassword, ok := authObj["password"].(string)
+	if !ok || encryptedPassword == "" {
+		return createInterceptorErrorResponseWithStatus(loggingContextFields, http.StatusBadRequest, matrix.ErrorBadJson, "Missing auth.password")
+	}
+
+	identifierRaw, ok := authObj["identifier"]
+	if !ok {
+		return createInterceptorErrorResponseWithStatus(loggingContextFields, http.StatusBadRequest, matrix.ErrorBadJson, "Missing auth.identifier")
+	}
+	identifierBytes, err := json.Marshal(identifierRaw)
 	if err != nil {
 		loggingContextFields["err"] = err.Error()
-		return createInterceptorErrorResponse(loggingContextFields, matrix.ErrorBadJson, "Invalid auth.identifier")
+		return createInterceptorErrorResponseWithStatus(loggingContextFields, http.StatusBadRequest, matrix.ErrorBadJson, "Invalid auth.identifier")
 	}
 
-	decryptedUsername, decryptedPassword, err := util.ProcessEncryptedUserAuth(payload.Auth.Password, me.config.DecryptKey)
+	pin, err := parseIdentifierPIN(identifierBytes)
+	if err != nil {
+		loggingContextFields["err"] = err.Error()
+		return createInterceptorErrorResponseWithStatus(loggingContextFields, http.StatusBadRequest, matrix.ErrorBadJson, "Invalid auth.identifier")
+	}
+
+	decryptedUsername, decryptedPassword, err := util.ProcessEncryptedUserAuth(encryptedPassword, me.config.DecryptKey)
 	if err != nil {
 		logrus.Errorf("Failed to process encrypted user auth: %v", err)
-		return createInterceptorErrorResponse(loggingContextFields, matrix.ErrorBadJson, "Failed to process authentication")
+		return createInterceptorErrorResponseWithStatus(loggingContextFields, http.StatusBadRequest, matrix.ErrorBadJson, "Failed to process authentication")
 	}
 
 	composedPassword := fmt.Sprintf("%s%s", decryptedPassword, pin)
 	loggingContextFields["userId"] = decryptedUsername
 
+	// Keep the existing auth object (including UIA `session` and unknown keys),
+	// only replacing credential-specific fields.
+	authObj["password"] = composedPassword
+	authObj["identifier"] = matrix.ApiLoginRequestIdentifier{
+		Type: matrix.LoginIdentifierTypeUser,
+		User: decryptedUsername,
+	}
+
+	authBytes, err := json.Marshal(authObj)
+	if err != nil {
+		return createInterceptorErrorResponseWithStatus(loggingContextFields, http.StatusInternalServerError, matrix.ErrorUnknown, "Internal error")
+	}
+
 	out := matrix.ApiAccountPasswordRequestPayload{
-		Auth: matrix.ApiAccountPasswordAuth{
-			Type: matrix.LoginTypePassword,
-			Identifier: matrix.ApiLoginRequestIdentifier{
-				Type: matrix.LoginIdentifierTypeUser,
-				User: decryptedUsername,
-			},
-			Password: composedPassword,
-		},
+		Auth:          authBytes,
 		LogoutDevices: payload.LogoutDevices,
 		NewPassword:   payload.NewPassword,
 	}
 
 	newBodyBytes, err := json.Marshal(out)
 	if err != nil {
-		return createInterceptorErrorResponse(loggingContextFields, matrix.ErrorUnknown, "Internal error")
+		return createInterceptorErrorResponseWithStatus(loggingContextFields, http.StatusInternalServerError, matrix.ErrorUnknown, "Internal error")
 	}
 
 	r.Body = io.NopCloser(bytes.NewReader(newBodyBytes))

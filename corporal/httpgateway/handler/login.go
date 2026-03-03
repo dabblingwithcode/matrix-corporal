@@ -5,6 +5,7 @@ import (
 	"devture-matrix-corporal/corporal/httpgateway/hookrunner"
 	"devture-matrix-corporal/corporal/httpgateway/interceptor"
 	"devture-matrix-corporal/corporal/httphelp"
+	"devture-matrix-corporal/corporal/matrix"
 	"net/http"
 	"net/http/httputil"
 
@@ -16,7 +17,6 @@ type loginHandler struct {
 	reverseProxy              *httputil.ReverseProxy
 	hookRunner                *hookrunner.HookRunner
 	loginInterceptor          interceptor.Interceptor
-	passwordChangeInterceptor interceptor.Interceptor
 	logger                    *logrus.Logger
 }
 
@@ -24,15 +24,13 @@ func NewLoginHandler(
 	reverseProxy *httputil.ReverseProxy,
 	hookRunner *hookrunner.HookRunner,
 	loginInterceptor interceptor.Interceptor,
-	passwordChangeInterceptor interceptor.Interceptor,
 	logger *logrus.Logger,
 ) *loginHandler {
 	return &loginHandler{
-		reverseProxy:              reverseProxy,
-		hookRunner:                hookRunner,
-		loginInterceptor:          loginInterceptor,
-		passwordChangeInterceptor: passwordChangeInterceptor,
-		logger:                    logger,
+		reverseProxy:     reverseProxy,
+		hookRunner:       hookRunner,
+		loginInterceptor: loginInterceptor,
+		logger:           logger,
 	}
 }
 
@@ -52,10 +50,6 @@ func (me *loginHandler) RegisterRoutesWithRouter(router *mux.Router) {
 	router.Handle(
 		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/encryptedLogin{optionalTrailingSlash:[/]?}`,
 		me.createInterceptorHandler("encryptedLogin", me.loginInterceptor),
-	).Methods("POST")
-	router.Handle(
-		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/account/encryptedPassword{optionalTrailingSlash:[/]?}`,
-		me.createInterceptorHandler("account.encryptedPassword", me.passwordChangeInterceptor),
 	).Methods("POST")
 }
 
@@ -94,9 +88,14 @@ func (me *loginHandler) createInterceptorHandler(name string, interceptorObj int
 				interceptorResult.ErrorMessage,
 			)
 
+			statusCode := interceptorResult.StatusCode
+			if statusCode == 0 {
+				statusCode = statusCodeForInterceptorErrorCode(interceptorResult.ErrorCode)
+			}
+
 			httphelp.RespondWithMatrixError(
 				w,
-				http.StatusForbidden,
+				statusCode,
 				interceptorResult.ErrorCode,
 				interceptorResult.ErrorMessage,
 			)
@@ -123,6 +122,17 @@ func (me *loginHandler) createInterceptorHandler(name string, interceptorObj int
 		}
 
 		logger.Fatalf("HTTP gateway (intercepted): unexpected interceptor result: %#v", interceptorResult)
+	}
+}
+
+func statusCodeForInterceptorErrorCode(errorCode string) int {
+	switch errorCode {
+	case matrix.ErrorBadJson, matrix.ErrorMissingParameter:
+		return http.StatusBadRequest
+	case matrix.ErrorMissingToken:
+		return http.StatusUnauthorized
+	default:
+		return http.StatusForbidden
 	}
 }
 

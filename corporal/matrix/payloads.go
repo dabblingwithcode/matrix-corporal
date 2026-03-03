@@ -93,9 +93,10 @@ type ApiUserAccountRegisterResponse struct {
 
 // ApiAccountPasswordRequestPayload is the request body for POST .../account/password (Matrix spec).
 type ApiAccountPasswordRequestPayload struct {
-	Auth          ApiAccountPasswordAuth `json:"auth"`
-	LogoutDevices bool                   `json:"logout_devices"`
-	NewPassword   string                 `json:"new_password"`
+	// Auth is kept as raw JSON to preserve UIA session/type and stage-specific keys.
+	Auth          json.RawMessage `json:"auth"`
+	LogoutDevices *bool           `json:"logout_devices,omitempty"`
+	NewPassword   string          `json:"new_password"`
 }
 
 // ApiAccountPasswordAuth is the auth object for account/password (type m.login.password).
@@ -108,14 +109,8 @@ type ApiAccountPasswordAuth struct {
 // ApiAccountPasswordEncryptedRequestPayload is the incoming body for .../account/encryptedPassword.
 // Client sends auth.password = encrypted credentials, auth.identifier = PIN (string or { "user": "<PIN>" }).
 type ApiAccountPasswordEncryptedRequestPayload struct {
-	Auth          ApiAccountPasswordEncryptedAuth `json:"auth"`
-	LogoutDevices bool                            `json:"logout_devices"`
-	NewPassword   string                          `json:"new_password"`
-}
-
-// ApiAccountPasswordEncryptedAuth holds encrypted auth; identifier is PIN (parsed flexibly).
-type ApiAccountPasswordEncryptedAuth struct {
-	Password   string          `json:"password"`
-	Identifier json.RawMessage `json:"identifier"` // string (PIN) or { "user": "<PIN>" }
+	Auth          json.RawMessage `json:"auth"`
+	LogoutDevices *bool           `json:"logout_devices,omitempty"`
+	NewPassword   string          `json:"new_password"`
 }
 

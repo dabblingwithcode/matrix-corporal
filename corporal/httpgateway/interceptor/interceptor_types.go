@@ -18,6 +18,7 @@ type InterceptorResponse struct {
 
 	LoggingContextFields logrus.Fields
 
+	StatusCode int
 	ErrorCode    string
 	ErrorMessage string
 }

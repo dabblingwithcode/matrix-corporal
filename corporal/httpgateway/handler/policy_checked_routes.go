@@ -4,6 +4,7 @@ import (
 	"context"
 	"devture-matrix-corporal/corporal/hook"
 	"devture-matrix-corporal/corporal/httpgateway/hookrunner"
+	"devture-matrix-corporal/corporal/httpgateway/interceptor"
 	"devture-matrix-corporal/corporal/httpgateway/policycheck"
 	"devture-matrix-corporal/corporal/httphelp"
 	"devture-matrix-corporal/corporal/matrix"
@@ -19,6 +20,7 @@ type policyCheckedRoutesHandler struct {
 	reverseProxy        *httputil.ReverseProxy
 	policyStore         *policy.Store
 	policyChecker       *policy.Checker
+	passwordInterceptor interceptor.Interceptor
 	hookRunner          *hookrunner.HookRunner
 	userMappingResolver *matrix.UserMappingResolver
 	logger              *logrus.Logger
@@ -28,6 +30,7 @@ func NewPolicyCheckedRoutesHandler(
 	reverseProxy *httputil.ReverseProxy,
 	policyStore *policy.Store,
 	policyChecker *policy.Checker,
+	passwordInterceptor interceptor.Interceptor,
 	hookRunner *hookrunner.HookRunner,
 	userMappingResolver *matrix.UserMappingResolver,
 	logger *logrus.Logger,
@@ -36,6 +39,7 @@ func NewPolicyCheckedRoutesHandler(
 		reverseProxy:        reverseProxy,
 		policyStore:         policyStore,
 		policyChecker:       policyChecker,
+		passwordInterceptor: passwordInterceptor,
 		hookRunner:          hookRunner,
 		userMappingResolver: userMappingResolver,
 		logger:              logger,
@@ -68,50 +72,50 @@ func (me *policyCheckedRoutesHandler) RegisterRoutesWithRouter(router *mux.Route
 
 	router.HandleFunc(
 		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/rooms/{roomId}/leave{optionalTrailingSlash:[/]?}`,
-		me.createPolicyCheckingHandler("room.leave", policycheck.CheckRoomLeave, false),
+		me.createPolicyCheckingHandler("room.leave", policycheck.CheckRoomLeave, false, nil),
 	).Methods("POST")
 
 	// Another way to leave a room is kick yourself out of it. It doesn't require any special permissions.
 	router.HandleFunc(
 		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/rooms/{roomId}/kick{optionalTrailingSlash:[/]?}`,
-		me.createPolicyCheckingHandler("room.kick", policycheck.CheckRoomKick, false),
+		me.createPolicyCheckingHandler("room.kick", policycheck.CheckRoomKick, false, nil),
 	).Methods("POST")
 
 	// Another way to leave a room is to PUT a "membership=leave" into your m.room.member state.
 	router.HandleFunc(
 		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/rooms/{roomId}/state/m.room.member/{memberId}{optionalTrailingSlash:[/]?}`,
-		me.createPolicyCheckingHandler("room.member.state.set", policycheck.CheckRoomMembershipStateChange, false),
+		me.createPolicyCheckingHandler("room.member.state.set", policycheck.CheckRoomMembershipStateChange, false, nil),
 	).Methods("PUT")
 
 	// Another way to make a room encrypted is by enabling encryption subsequently.
 	router.HandleFunc(
 		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/rooms/{roomId}/state/m.room.encryption{optionalTrailingSlash:[/]?}`,
-		me.createPolicyCheckingHandler("room.subsequenly_enabling_encryption", policycheck.CheckRoomEncryptionStateChange, false),
+		me.createPolicyCheckingHandler("room.subsequenly_enabling_encryption", policycheck.CheckRoomEncryptionStateChange, false, nil),
 	).Methods("PUT")
 
 	router.HandleFunc(
 		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/createRoom{optionalTrailingSlash:[/]?}`,
-		me.createPolicyCheckingHandler("room.create", policycheck.CheckRoomCreate, false),
+		me.createPolicyCheckingHandler("room.create", policycheck.CheckRoomCreate, false, nil),
 	).Methods("POST")
 
 	router.HandleFunc(
 		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/rooms/{roomId}/send/{eventType}/{txnId}{optionalTrailingSlash:[/]?}`,
-		me.createPolicyCheckingHandler("room.send_event", policycheck.CheckRoomSendEvent, false),
+		me.createPolicyCheckingHandler("room.send_event", policycheck.CheckRoomSendEvent, false, nil),
 	).Methods("PUT")
 
 	router.HandleFunc(
 		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/profile/{targetUserId}/displayname{optionalTrailingSlash:[/]?}`,
-		me.createPolicyCheckingHandler("user.set_display_name", policycheck.CheckProfileSetDisplayName, false),
+		me.createPolicyCheckingHandler("user.set_display_name", policycheck.CheckProfileSetDisplayName, false, nil),
 	).Methods("PUT")
 
 	router.HandleFunc(
 		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/profile/{targetUserId}/avatar_url{optionalTrailingSlash:[/]?}`,
-		me.createPolicyCheckingHandler("user.set_avatar", policycheck.CheckProfileSetAvatarUrl, false),
+		me.createPolicyCheckingHandler("user.set_avatar", policycheck.CheckProfileSetAvatarUrl, false, nil),
 	).Methods("PUT")
 
 	router.HandleFunc(
 		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/account/deactivate{optionalTrailingSlash:[/]?}`,
-		me.createPolicyCheckingHandler("user.deactivate", policycheck.CheckUserDeactivate, false),
+		me.createPolicyCheckingHandler("user.deactivate", policycheck.CheckUserDeactivate, false, nil),
 	).Methods("POST")
 
 	// This Client-Server API is used for 2 things:
@@ -121,7 +125,14 @@ func (me *policyCheckedRoutesHandler) RegisterRoutesWithRouter(router *mux.Route
 	// We don't want to break the 2nd (access-token-less) flow in some cases (depending on the policy).
 	router.HandleFunc(
 		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/account/password{optionalTrailingSlash:[/]?}`,
-		me.createPolicyCheckingHandler("user.password", policycheck.CheckUserSetPassword, true),
+		me.createPolicyCheckingHandler("user.password", policycheck.CheckUserSetPassword, true, nil),
+	).Methods("POST")
+
+	// Same policy checks as /account/password, but payload is first normalized/decrypted
+	// by passwordInterceptor and then rewritten to /account/password.
+	router.HandleFunc(
+		`/_matrix/client/{apiVersion:(?:r0|v\d+)}/account/encryptedPassword{optionalTrailingSlash:[/]?}`,
+		me.createPolicyCheckingHandler("user.encrypted_password", policycheck.CheckUserSetPassword, true, me.passwordInterceptor),
 	).Methods("POST")
 }
 
@@ -129,6 +140,7 @@ func (me *policyCheckedRoutesHandler) createPolicyCheckingHandler(
 	name string,
 	policyCheckingCallback policycheck.PolicyCheckFunc,
 	allowUnauthenticatedAccess bool,
+	interceptorObj interceptor.Interceptor,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := me.logger.WithField("method", r.Method)
@@ -226,6 +238,32 @@ func (me *policyCheckedRoutesHandler) createPolicyCheckingHandler(
 			return
 		}
 
+		if interceptorObj != nil {
+			interceptorResult := interceptorObj.Intercept(r)
+			logger = logger.WithFields(interceptorResult.LoggingContextFields)
+
+			if interceptorResult.Result == interceptor.InterceptorResultDeny {
+				logger.Infof(
+					"HTTP gateway (policy-checked/intercepted): denying (%s: %s)",
+					interceptorResult.ErrorCode,
+					interceptorResult.ErrorMessage,
+				)
+
+				statusCode := interceptorResult.StatusCode
+				if statusCode == 0 {
+					statusCode = statusCodeForMatrixErrorCode(interceptorResult.ErrorCode)
+				}
+
+				httphelp.RespondWithMatrixError(
+					w,
+					statusCode,
+					interceptorResult.ErrorCode,
+					interceptorResult.ErrorMessage,
+				)
+				return
+			}
+		}
+
 		if !runHooks(me.hookRunner, hook.EventTypeAfterAnyRequest, w, r, logger, &httpResponseModifierFuncs) {
 			return
 		}
@@ -253,6 +291,17 @@ func (me *policyCheckedRoutesHandler) createPolicyCheckingHandler(
 		}
 
 		reverseProxyToUse.ServeHTTP(w, r)
+	}
+}
+
+func statusCodeForMatrixErrorCode(errorCode string) int {
+	switch errorCode {
+	case matrix.ErrorBadJson, matrix.ErrorMissingParameter:
+		return http.StatusBadRequest
+	case matrix.ErrorMissingToken:
+		return http.StatusUnauthorized
+	default:
+		return http.StatusForbidden
 	}
 }
 

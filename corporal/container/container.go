@@ -173,6 +173,7 @@ func BuildContainer(
 			container.Get("matrix.http_reverse_proxy").(*httputil.ReverseProxy),
 			container.Get("policy.store").(*policy.Store),
 			container.Get("policy.checker").(*policy.Checker),
+			container.Get("httpgateway.interceptor.password_change").(interceptor.Interceptor),
 			container.Get("httpgateway.hook_runner").(*hookrunner.HookRunner),
 			container.Get("matrix.user_mapping_resolver").(*matrix.UserMappingResolver),
 			logger,
@@ -184,7 +185,6 @@ func BuildContainer(
 			container.Get("matrix.http_reverse_proxy").(*httputil.ReverseProxy),
 			container.Get("httpgateway.hook_runner").(*hookrunner.HookRunner),
 			container.Get("httpgateway.interceptor.login").(interceptor.Interceptor),
-			container.Get("httpgateway.interceptor.password_change").(interceptor.Interceptor),
 			logger,
 		)
 	})
