@@ -11,7 +11,11 @@ on:
         type: choice
         options:
           - "production"
-  workflow_call:
+      reset_data:
+        description: "Type RESET to wipe postgres/synapse data before deploy"
+        required: false
+        default: ""
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -20,7 +24,44 @@ env:
   GHCR_ORG: "dabblingwithcode"
 
 jobs:
+  reset:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.reset_data == 'RESET'
+    steps:
+      - name: Install SSH keys
+        run: |
+          install -m 600 -D /dev/null ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Add SSH key to the agent
+        run: |
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
+
+      - name: Stop containers and remove data volumes
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            'cd ~/matrix-corporal/docker && \
+             POSTGRES_USER="${{ secrets.POSTGRES_USER }}" \
+             POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
+             POSTGRES_DB="${{ secrets.POSTGRES_DB }}" \
+             MATRIX_SERVER_NAME="${{ secrets.MATRIX_SERVER_NAME }}" \
+             ACME_EMAIL="${{ secrets.ACME_EMAIL }}" \
+             GHCR_ORG="${{ env.GHCR_ORG }}" \
+             docker compose -f compose.production.yml -p matrix-corporal down && \
+             docker volume rm matrix-corporal_postgres_data || true && \
+             docker volume rm matrix-corporal_synapse_data || true && \
+             docker volume rm matrix-corporal_synapse_media || true && \
+             echo "Data volumes removed. letsencrypt_data preserved."'
+
+      - name: Cleanup SSH keys
+        run: rm -rf ~/.ssh
+
   build-and-push-image:
+    needs: reset
+    if: always() && !failure() && !cancelled()
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -56,7 +97,8 @@ jobs:
           platforms: linux/amd64
 
   deploy:
-    needs: build-and-push-image
+    needs: [reset, build-and-push-image]
+    if: always() && !failure() && !cancelled()
     name: Deploy to production
     runs-on: ubuntu-latest
     steps:
