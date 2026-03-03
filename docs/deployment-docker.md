@@ -304,6 +304,8 @@ Open `.github/workflows/deploy.yml` and update the `GHCR_ORG` variable with your
 
 You can also change the trigger branch at the top of the file (default is `main`).
 
+Optional: reset the project in the vps before deploying
+
 ### How the workflow works
 
 The GitHub Action performs two jobs:
