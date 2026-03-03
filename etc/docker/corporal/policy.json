@@ -19,7 +19,7 @@
         { "type": "route", "regex": "^/_matrix/client/(r0|v3)/rooms/[^/]+/invite$" }
       ],
       "action": "consult.RESTServiceURL",
-      "RESTServiceURL": "http://hook-rest-service:8080/reject-invite-to-matrix-corporal",
+      "RESTServiceURL": "http://hook-rest-service:8080/reject-invite-to-admin",
       "RESTServiceContingencyHook": {
         "action": "reject",
         "responseStatusCode": 503,
