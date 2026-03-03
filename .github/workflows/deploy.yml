@@ -129,6 +129,7 @@ jobs:
           export MATRIX_REGISTRATION_SHARED_SECRET="${{ secrets.MATRIX_REGISTRATION_SHARED_SECRET }}"
           export MATRIX_MACAROON_SECRET_KEY="${{ secrets.MATRIX_MACAROON_SECRET_KEY }}"
           export MATRIX_FORM_SECRET="${{ secrets.MATRIX_FORM_SECRET }}"
+          export MATRIX_ADMIN_ID="${{ secrets.MATRIX_ADMIN_ID }}"
           export POSTGRES_USER="${{ secrets.POSTGRES_USER }}"
           export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
           export POSTGRES_DB="${{ secrets.POSTGRES_DB }}"
