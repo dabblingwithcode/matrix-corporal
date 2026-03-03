@@ -11,6 +11,7 @@ on:
         type: choice
         options:
           - "production"
+  workflow_call:
 
 env:
   REGISTRY: ghcr.io
