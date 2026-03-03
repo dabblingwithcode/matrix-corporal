@@ -26,7 +26,7 @@ env:
 jobs:
   reset:
     runs-on: ubuntu-latest
-    ##- If RESET is provided as an input or the commit message contains [RESET], run the reset job
+    ##- If RESET is provided as an input **or** the commit message contains [RESET], run the reset job
     if: >-
       github.event.inputs.reset_data == 'RESET' ||
       (github.event_name == 'push' && contains(github.event.head_commit.message, '[RESET]'))
