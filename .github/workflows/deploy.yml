@@ -108,6 +108,25 @@ jobs:
           envsubst < etc/docker/element-web/config.production.json > etc/docker/element-web/config.production.json.out
           mv etc/docker/element-web/config.production.json.out etc/docker/element-web/config.production.json
 
+      - name: Verify and log substitution
+        run: |
+          echo "--- Synapse config ---"
+          if grep -E '\$\{MATRIX_|\$\{POSTGRES_' etc/docker/synapse/homeserver.production.yaml 2>/dev/null; then
+            echo "::warning:: Unsubstituted placeholders in Synapse config"
+          fi
+          grep 'server_name:' etc/docker/synapse/homeserver.production.yaml | sed 's/: .*/: [REDACTED]/' || true
+          echo "--- matrix-corporal config ---"
+          if grep -E '\$\{MATRIX_|\$\{CORPORAL_' etc/docker/corporal/config.production.json 2>/dev/null; then
+            echo "::warning:: Unsubstituted placeholders in matrix-corporal config"
+          fi
+          grep 'HomeserverDomainName' etc/docker/corporal/config.production.json | sed 's/: .*/: [REDACTED]/' || true
+          echo "--- Element-web config ---"
+          if grep -E '\$\{MATRIX_' etc/docker/element-web/config.production.json 2>/dev/null; then
+            echo "::warning:: Unsubstituted placeholders in Element-web config"
+          fi
+          grep 'default_hs_url' etc/docker/element-web/config.production.json | sed 's/: .*/: [REDACTED]/' || true
+          echo "Substitution completed; critical keys redacted above."
+
       - name: Copy deployment files to VPS
         run: |
           rsync -avz --delete \
