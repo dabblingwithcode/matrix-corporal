@@ -1,7 +1,7 @@
 # Deploying Matrix-Corporal to a VPS using Docker
 
 **This is heavily based on https://github.com/inf0rmatix/serverpod_vps and AI generated !**
-This guide walks you through deploying the full matrix-corporal stack to a Virtual Private Server (VPS) with Docker.
+This guide walks you through deploying the full matrix-corporal stack to a Virtual Private Server (VPS) with Docker. 
 
 The deployment includes:
 
