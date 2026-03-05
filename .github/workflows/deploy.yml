@@ -7,10 +7,11 @@ on:
       target:
         description: "Target"
         required: true
-        default: "production"
+        default: "deploy-test"
         type: choice
         options:
-          - "production"
+          - "main"
+          - "deploy-test"
       reset_data:
         description: "Type RESET to wipe postgres/synapse data before deploy"
         required: false
