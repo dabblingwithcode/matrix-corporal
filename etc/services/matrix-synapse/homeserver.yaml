@@ -1230,10 +1230,6 @@ password_config:
 #        #bind_dn:
 #        #bind_password:
 #        #filter: "(objectClass=posixAccount)"
-password_providers:
-- module: "rest_auth_provider.RestAuthProvider"
-  config:
-    endpoint: "http://matrix-corporal:41080/_matrix/corporal"
 
 
 # Clients requesting push notifications can either have the body of

@@ -43,7 +43,12 @@ services:
       - ./synapse/homeserver.production.yaml:/data/homeserver.yaml:ro
       - ./synapse/log.config:/data/log.config:ro
       - ./shared_secret_authenticator.py:/usr/local/lib/python3.12/site-packages/shared_secret_authenticator.py:ro
-      - ./rest_auth_provider.py:/usr/local/lib/python3.12/site-packages/rest_auth_provider.py:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.matrix.rule=Host(`matrix.${MATRIX_SERVER_NAME}`)
+      - traefik.http.routers.matrix.entrypoints=websecure
+      - traefik.http.routers.matrix.tls.certresolver=letsencrypt
+      - traefik.http.services.matrix.loadbalancer.server.port=8008
     restart: unless-stopped
 
   element-web:
@@ -56,38 +61,6 @@ services:
       - traefik.http.routers.element.entrypoints=websecure
       - traefik.http.routers.element.tls.certresolver=letsencrypt
       - traefik.http.services.element.loadbalancer.server.port=80
-    restart: unless-stopped
-
-  hook-rest-service:
-    image: docker.io/php:8.4.11-cli-alpine3.22
-    volumes:
-      - ./hook-rest-service:/work:ro
-    command: ["/usr/local/bin/php", "-S", "0.0.0.0:8080", "/work/index.php"]
-    stop_grace_period: 1s
-    restart: unless-stopped
-
-  matrix-corporal:
-    image: ghcr.io/${GHCR_ORG}/matrix-corporal:latest
-    depends_on:
-      - synapse
-      - hook-rest-service
-    volumes:
-      - ./corporal/config.production.json:/config.json:ro
-      - ./corporal/policy.json:/policy.json:ro
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.matrix.rule=Host(`matrix.${MATRIX_SERVER_NAME}`)
-      - traefik.http.routers.matrix.priority=1
-      - traefik.http.routers.matrix.service=matrix
-      - traefik.http.routers.matrix.entrypoints=websecure
-      - traefik.http.routers.matrix.tls.certresolver=letsencrypt
-      - traefik.http.services.matrix.loadbalancer.server.port=41080
-      - traefik.http.routers.matrix-api.rule=Host(`matrix.${MATRIX_SERVER_NAME}`) && PathPrefix(`/_matrix/corporal`)
-      - traefik.http.routers.matrix-api.priority=100
-      - traefik.http.routers.matrix-api.service=matrix-api
-      - traefik.http.routers.matrix-api.entrypoints=websecure
-      - traefik.http.routers.matrix-api.tls.certresolver=letsencrypt
-      - traefik.http.services.matrix-api.loadbalancer.server.port=41081
     restart: unless-stopped
 
 volumes:

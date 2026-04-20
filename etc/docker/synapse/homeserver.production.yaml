@@ -11,6 +11,8 @@ pid_file: /homeserver.pid
 
 default_room_version: "11"
 
+federation_domain_whitelist: []
+
 federation_ip_range_blacklist:
   - '127.0.0.0/8'
   - '10.0.0.0/8'
@@ -45,6 +47,7 @@ log_config: "/data/log.config"
 
 media_store_path: "/media_store"
 uploads_path: "/tmp"
+require_auth_for_profile_requests: true
 
 room_list_publication_rules:
   - user_id: "@${MATRIX_ADMIN_ID}:${MATRIX_SERVER_NAME}"
@@ -82,7 +85,3 @@ signing_key_path: "/data/signing.key"
 
 report_stats: false
 
-password_providers:
-  - module: "rest_auth_provider.RestAuthProvider"
-    config:
-      endpoint: "http://matrix-corporal:41080/_matrix/corporal"

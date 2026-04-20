@@ -1,0 +1,13 @@
+# Override for Windows: use a named volume for Postgres data and run as the
+# image's postgres user (70:70) so initdb can chmod the data directory.
+# The base compose runs postgres as CURRENT_USER_UID:GID, which causes
+# "Operation not permitted" when initdb tries to set permissions.
+services:
+  postgres:
+    user: "70:70"
+    volumes:
+    - postgres_data:/var/lib/postgresql/data
+    - /etc/passwd:/etc/passwd:ro
+
+volumes:
+  postgres_data:
